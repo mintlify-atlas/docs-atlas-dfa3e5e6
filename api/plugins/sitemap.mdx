@@ -1,0 +1,155 @@
+---
+title: "plugin-sitemap: Sitemap Plugin Configuration Reference"
+description: "Complete option reference for @docusaurus/plugin-sitemap covering changefreq, priority, ignorePatterns, filename, lastmod, and createSitemapItems."
+---
+
+`@docusaurus/plugin-sitemap` generates a `sitemap.xml` file at build time so that search engine crawlers can discover and index your site's pages. The plugin respects the `noIndex` and `trailingSlash` settings in `docusaurus.config.js` and is included in `@docusaurus/preset-classic` with sensible defaults.
+
+<Warning>
+This plugin is always inactive in development. It only runs during a production build (`docusaurus build`) because it works on the final build output.
+</Warning>
+
+## Installation
+
+```bash npm2yarn
+npm install --save @docusaurus/plugin-sitemap
+```
+
+<Tip>
+If you use `@docusaurus/preset-classic`, configure this plugin through the `sitemap` preset key instead of adding it to the `plugins` array.
+</Tip>
+
+## Configuration options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `changefreq` | `string \| null` | `'weekly'` | The `<changefreq>` value written into every sitemap entry. Any value from the [sitemap protocol](https://www.sitemaps.org/protocol.html#xmlTagDefinitions) is accepted (`always`, `hourly`, `daily`, `weekly`, `monthly`, `yearly`, `never`). Set `null` to omit the tag. |
+| `priority` | `number \| null` | `0.5` | The `<priority>` value written into every sitemap entry (0.0–1.0). Set `null` to omit the tag. |
+| `lastmod` | `'date' \| 'datetime' \| null` | `null` | Controls the `<lastmod>` tag format. `'date'` outputs `YYYY-MM-DD`; `'datetime'` outputs a full ISO 8601 timestamp. `null` disables the tag. |
+| `ignorePatterns` | `string[]` | `[]` | Glob patterns for route paths to exclude from the sitemap. You may need to include the base URL in patterns. |
+| `filename` | `string` | `'sitemap.xml'` | Output file name, relative to the build output directory. Useful when running multiple plugin instances to avoid filename conflicts. |
+| `createSitemapItems` | `CreateSitemapItemsFn \| undefined` | `undefined` | Optional function to transform or filter sitemap entries after they are generated. |
+
+## Type definitions
+
+### `CreateSitemapItemsFn`
+
+```ts
+type CreateSitemapItemsFn = (params: {
+  siteConfig: DocusaurusConfig;
+  routes: RouteConfig[];
+  defaultCreateSitemapItems: CreateSitemapItemsFn;
+}) => Promise<SitemapItem[]>;
+```
+
+## Site config integration
+
+<Info>
+The plugin also reads two global site config options:
+
+- **`noIndex: true`** — the entire sitemap is suppressed; no `sitemap.xml` is generated.
+- **`trailingSlash`** — controls whether URLs in the sitemap end with a trailing slash.
+</Info>
+
+### About `lastmod`
+
+The `lastmod` option only writes a `<lastmod>` tag for routes where a plugin has attached `sourceFilePath` or `lastUpdatedAt` metadata via `addRoute`. All official content plugins (`plugin-content-docs`, `plugin-content-blog`, `plugin-content-pages`) provide this metadata for Markdown and MDX files automatically. Custom or third-party plugins may not, in which case `<lastmod>` will not appear for those routes.
+
+## Example configuration
+
+<Tabs>
+  <Tab title="Preset options (recommended)">
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        sitemap: {
+          lastmod: 'date',
+          changefreq: 'weekly',
+          priority: 0.5,
+          ignorePatterns: ['/tags/**', '/blog/page/**'],
+          filename: 'sitemap.xml',
+        },
+      },
+    ],
+  ],
+};
+```
+
+  </Tab>
+  <Tab title="Standalone plugin">
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: [
+    [
+      '@docusaurus/plugin-sitemap',
+      {
+        changefreq: 'daily',
+        priority: 0.7,
+        ignorePatterns: ['/tags/**'],
+        filename: 'sitemap.xml',
+      },
+    ],
+  ],
+};
+```
+
+  </Tab>
+</Tabs>
+
+## Filtering sitemap items
+
+Use `createSitemapItems` to exclude specific URLs or modify properties per-entry. The function receives the full list of generated items and must return a (possibly modified) array:
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        sitemap: {
+          createSitemapItems: async (params) => {
+            const {defaultCreateSitemapItems, ...rest} = params;
+            const items = await defaultCreateSitemapItems(rest);
+            // Exclude paginated list pages from the sitemap
+            return items.filter((item) => !item.url.includes('/page/'));
+          },
+        },
+      },
+    ],
+  ],
+};
+```
+
+## Multiple sitemap instances
+
+Run two instances of the plugin to produce separate sitemaps for distinct content areas:
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: [
+    [
+      '@docusaurus/plugin-sitemap',
+      {
+        id: 'docs-sitemap',
+        ignorePatterns: ['/blog/**'],
+        filename: 'sitemap-docs.xml',
+      },
+    ],
+    [
+      '@docusaurus/plugin-sitemap',
+      {
+        id: 'blog-sitemap',
+        ignorePatterns: ['/docs/**'],
+        filename: 'sitemap-blog.xml',
+      },
+    ],
+  ],
+};
+```
+
+After building, find your sitemap at `/sitemap.xml` (or the path you configured with `filename`).

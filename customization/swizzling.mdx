@@ -1,0 +1,203 @@
+---
+title: "Customize Docusaurus Theme Components via Swizzling"
+description: "Swizzle Docusaurus theme components by wrapping or ejecting them to fully customize the look, behavior, and layout of any part of your documentation site."
+---
+
+Swizzling is the mechanism Docusaurus uses to let you replace or extend any React component provided by a theme. Instead of forking an entire theme, you surgically override just the component you need — keeping the rest of the theme intact and upgradeable. There are two approaches: **wrapping** adds behavior around the original component, while **ejecting** replaces it entirely with your own copy.
+
+## How swizzling works
+
+Docusaurus resolves theme components through a set of [theme aliases](https://docusaurus.io/docs/advanced/client#theme-aliases). When you place a component at `src/theme/SomeComponent.js`, Docusaurus routes the `@theme/SomeComponent` alias to your file instead of the theme's original file. The swizzle CLI automates this process for you.
+
+<Tabs>
+  <Tab title="Wrapping">
+    A wrapper imports the **original** component via `@theme-original/SomeComponent` and renders it alongside any additions you want. This is the safer approach because you maintain a thin layer of code and the original component continues to do its work.
+  </Tab>
+  <Tab title="Ejecting">
+    Ejecting copies the full source of the original component into your `src/theme` directory. You own all of it and can change anything, but you also have to maintain all of it across Docusaurus upgrades.
+  </Tab>
+</Tabs>
+
+## The swizzle CLI
+
+Docusaurus ships an interactive CLI that handles the file creation for you. In most cases you only need one command:
+
+```bash
+npm run swizzle
+```
+
+The CLI prompts you to pick a theme, then a component, then an action (wrap or eject). You can also pass arguments directly to skip the prompts.
+
+### Listing available components
+
+To see every component exposed by `@docusaurus/theme-classic`, run:
+
+```bash
+npm run swizzle @docusaurus/theme-classic -- --list
+```
+
+The output includes a safety rating for each component and each action. For full CLI options:
+
+```bash
+npm run swizzle -- --help
+```
+
+## Wrapping a component
+
+Wrapping is the recommended approach for most customizations. It keeps your diff small and survives theme upgrades more reliably.
+
+<Steps>
+  <Step title="Run the wrap command">
+    Pass `--wrap` to the CLI to create a wrapper for the `Footer` component:
+
+    ```bash
+    npm run swizzle @docusaurus/theme-classic Footer -- --wrap
+    ```
+  </Step>
+  <Step title="Edit the generated file">
+    The CLI writes `src/theme/Footer/index.js`. Open it and add your customizations around the original component:
+
+    ```jsx title="src/theme/Footer/index.js"
+    import React from 'react';
+    import Footer from '@theme-original/Footer';
+
+    export default function FooterWrapper(props) {
+      return (
+        <>
+          <section>
+            <h2>Extra section</h2>
+            <p>This content appears above the original footer</p>
+          </section>
+          <Footer {...props} />
+        </>
+      );
+    }
+    ```
+  </Step>
+  <Step title="Restart the dev server">
+    Docusaurus discovers swizzled components at startup. Restart `npm run start` for the new component to take effect.
+  </Step>
+</Steps>
+
+<Tip>
+Wrapping is ideal for adding comment systems, banners, or analytics hooks around existing components without duplicating their internals. For example, you can add a custom comment system under every blog post by wrapping `BlogPostItem`.
+</Tip>
+
+### The `@theme-original` alias
+
+When wrapping, you import the original component via `@theme-original/SomeComponent`. This alias bypasses your wrapper and points directly at the theme's file, preventing an infinite import loop.
+
+## Ejecting a component
+
+Ejecting creates a full copy of the component's source in your project. Use this only when wrapping is genuinely insufficient — for instance, when you need to restructure the component's JSX from scratch.
+
+<Steps>
+  <Step title="Run the eject command">
+    ```bash
+    npm run swizzle @docusaurus/theme-classic Footer -- --eject
+    ```
+  </Step>
+  <Step title="Customize the ejected file">
+    The CLI writes the original source to `src/theme/Footer/index.js`. Edit it freely:
+
+    ```jsx title="src/theme/Footer/index.js"
+    import React from 'react';
+
+    export default function Footer(props) {
+      return (
+        <footer>
+          <h1>My custom footer</h1>
+          <p>Completely custom implementation</p>
+        </footer>
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+Ejecting an unsafe component copies a large amount of internal code that you must maintain yourself. Breaking changes to props or internal APIs in minor theme versions can silently break your site. Prefer wrapping whenever possible.
+</Warning>
+
+<Tip>
+After a Docusaurus upgrade, re-run the eject command and use `git diff` to compare the new original against your version. A short comment at the top of the ejected file explaining what you changed makes this comparison easier.
+</Tip>
+
+## Safety levels
+
+Not every component is equally stable. The swizzle CLI reports one of three safety levels for each component and action combination:
+
+<AccordionGroup>
+  <Accordion title="Safe">
+    The component's public API is considered stable. No breaking changes should occur within a major theme version. You can wrap or eject these components with confidence.
+  </Accordion>
+  <Accordion title="Unsafe">
+    This component is an internal implementation detail. Breaking changes may occur in **minor** theme versions. Swizzling is allowed but you may need to update your customization after upgrades.
+  </Accordion>
+  <Accordion title="Forbidden">
+    The CLI prevents swizzling this component entirely. It is not designed to be overridden.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+A component may be safe to wrap but unsafe to eject. The safety level is reported per action.
+</Note>
+
+Some commonly used safe components in `@docusaurus/theme-classic` include `Footer`, `Navbar`, `DocSidebar`, `TOC`, `CodeBlock`, `Admonition`, and `ColorModeToggle`. Run `--list` to see the full table with current safety ratings.
+
+## Finding the right component to swizzle
+
+`@docusaurus/theme-classic` has around 100 components. Use these strategies to identify the one you need:
+
+<Steps>
+  <Step title="Search by name">
+    Run the interactive CLI and type part of a component name to filter the list. For example, typing `Doc` narrows the results to documentation-related components.
+  </Step>
+  <Step title="Start from a top-level route component">
+    Every route has a top-level component such as `BlogPostPage` or `DocItem`. Swizzle it temporarily, inspect the output, then drill down to the specific sub-component you want to change. Delete the top-level swizzle once you've identified your target.
+  </Step>
+  <Step title="Read the theme source">
+    Browse the [theme source on GitHub](https://github.com/facebook/docusaurus/tree/main/packages/docusaurus-theme-classic/src/theme) and use search to trace where specific HTML is rendered.
+  </Step>
+</Steps>
+
+## TypeScript support
+
+All official Docusaurus themes support TypeScript theme components. Add the `--typescript` flag to generate `.tsx` source instead of `.js`:
+
+```bash
+npm run swizzle @docusaurus/theme-classic Footer -- --typescript
+```
+
+This generates `src/theme/Footer/index.tsx` along with `styles.module.css` where applicable.
+
+## Wrapping the entire React tree with `<Root>`
+
+The `<Root>` component sits at the very top of the React tree, above the theme `<Layout>`, and never unmounts. It is the right place for global state such as user authentication or a shopping cart. Create it manually at `src/theme/Root.js`:
+
+```js title="src/theme/Root.js"
+import React from 'react';
+
+export default function Root({children}) {
+  return <>{children}</>;
+}
+```
+
+<Tip>
+Use `<Root>` to mount React Context providers that need to persist across page navigations.
+</Tip>
+
+## When not to swizzle
+
+Before reaching for swizzling, consider lighter alternatives:
+
+<CardGroup cols={2}>
+  <Card title="CSS customization" icon="palette">
+    CSS rules and selectors cover a large portion of visual customizations. See the [styling and layout guide](/guides/styling) for details.
+  </Card>
+  <Card title="Translations" icon="language">
+    The `yarn write-translations` command lets you edit any text label in the theme without touching React components.
+  </Card>
+</CardGroup>
+
+If swizzling is the right choice, prefer wrapping over ejecting, and target the smallest component that achieves your goal. Less code to maintain means fewer surprises during upgrades.

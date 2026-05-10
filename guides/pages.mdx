@@ -1,0 +1,154 @@
+---
+title: "Create Standalone Pages in Docusaurus"
+description: "Build standalone pages in Docusaurus using React components or Markdown files. Pages in src/pages/ are automatically routed based on their file name and path."
+---
+
+Docusaurus lets you create standalone pages — such as a homepage, showcase, playground, or support page — completely separate from the docs system. The `@docusaurus/plugin-content-pages` plugin maps every file in `src/pages/` to a URL, supporting both React components and Markdown files.
+
+<Note>
+  Standalone pages do not have sidebars. Only docs have sidebars. If you want navigation between related content, use the docs plugin instead.
+</Note>
+
+## Routing
+
+Any JavaScript, TypeScript, or Markdown file placed inside `src/pages/` is automatically converted to a website page. The URL path mirrors the file system hierarchy:
+
+```bash
+src/pages/index.js        →  /
+src/pages/about.js        →  /about
+src/pages/foo/bar.js      →  /foo/bar
+src/pages/foo/index.js    →  /foo/
+```
+
+Files prefixed with `_` are ignored and will not produce routes. Test files (`.test.js`) and files inside `__tests__` directories are also excluded by default.
+
+```bash
+my-website
+├── src
+│   └── pages
+│       ├── index.js          # → /
+│       ├── support
+│       │   ├── index.js      # → /support/
+│       │   └── styles.module.css
+│       ├── _ignored.js       # not a route
+│       └── _ignored-folder
+│           ├── Component1.js
+│           └── Component2.js
+```
+
+<Warning>
+  All `.js`/`.ts`/`.jsx`/`.tsx` files in `src/pages/` generate routes. If you want to store reusable components in this directory, prefix them with `_` or use the `exclude` option in your plugin configuration.
+</Warning>
+
+## Adding a React page
+
+React is the UI library used to create pages. Every page must export a default React component. Wrap your content in the `Layout` component from `@theme/Layout` to get the site navbar and footer.
+
+<Steps>
+  <Step title="Create the file">
+    Add a new file at `src/pages/hello.jsx`:
+
+    ```jsx title="src/pages/hello.jsx"
+    import React from 'react';
+    import Layout from '@theme/Layout';
+
+    export default function Hello() {
+      return (
+        <Layout title="Hello" description="Hello React Page">
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              height: '50vh',
+              fontSize: '20px',
+            }}>
+            <p>
+              Edit <code>pages/hello.jsx</code> and save to reload.
+            </p>
+          </div>
+        </Layout>
+      );
+    }
+    ```
+  </Step>
+  <Step title="View the page">
+    The development server hot-reloads automatically. Open `http://localhost:3000/hello` to see the new page.
+  </Step>
+</Steps>
+
+<Tip>
+  TypeScript is fully supported. Use the `.tsx` extension (`hello.tsx`) and the page will work identically.
+</Tip>
+
+## Adding a Markdown page
+
+Markdown pages are simpler to write and always use the theme layout automatically. Create a file at `src/pages/hello.md`:
+
+```md title="src/pages/hello.md"
+---
+title: My Hello Page
+description: A simple Markdown page.
+hide_table_of_contents: true
+---
+
+# Hello
+
+How are you?
+```
+
+The page is available at `http://localhost:3000/hello`. Markdown pages are less flexible than React pages but support the full power of MDX — you can embed React components inside them.
+
+## Co-locating page assets
+
+For pages with their own styles or assets, place the page inside its own directory. This keeps related files grouped:
+
+```bash
+src/pages/support/
+├── index.jsx         # the page component
+└── styles.module.css # scoped CSS for this page only
+```
+
+```jsx title="src/pages/support/index.jsx"
+import React from 'react';
+import Layout from '@theme/Layout';
+import styles from './styles.module.css';
+
+export default function Support() {
+  return (
+    <Layout title="Support">
+      <main className={styles.container}>
+        <h1>Support</h1>
+      </main>
+    </Layout>
+  );
+}
+```
+
+## Handling duplicate routes
+
+If two files resolve to the same URL, Docusaurus warns you when running `yarn start` or `yarn build`. The last file wins, overriding the other. Resolve duplicates by renaming or removing the conflicting file.
+
+<AccordionGroup>
+  <Accordion title="Duplicate route example">
+    If you have both `src/pages/foo.js` and `src/pages/foo/index.js`, both map to `/foo`. Docusaurus will log a warning and keep one. Remove or rename one of the files to fix the conflict.
+  </Accordion>
+  <Accordion title="Controlling excluded files">
+    Use the `exclude` option in the pages plugin configuration to specify additional glob patterns for files that should not become routes:
+
+    ```js title="docusaurus.config.js"
+    export default {
+      presets: [
+        [
+          '@docusaurus/preset-classic',
+          {
+            pages: {
+              exclude: ['**/_*.{js,jsx,ts,tsx,md,mdx}', '**/*.test.{js,jsx}'],
+            },
+          },
+        ],
+      ],
+    };
+    ```
+  </Accordion>
+</AccordionGroup>

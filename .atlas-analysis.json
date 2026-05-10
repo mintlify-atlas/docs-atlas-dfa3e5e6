@@ -1,24 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Docusaurus",
+  "projectType": "framework",
+  "projectName": "Docusaurus",
+  "projectDescription": "A React-powered static site generator framework for building beautiful, maintainable documentation websites with built-in versioning, i18n, MDX support, and a rich plugin ecosystem.",
   "theme": "palm",
-  "colors": {
-    "primary": "#3fcd5d",
-    "light": "#f4f95e",
-    "dark": "#0e140f"
-  },
-  "favicon": "/favicon.svg",
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/facebook/docusaurus"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/facebook/docusaurus"
-    }
-  },
+  "primaryColor": "#3fcd5d",
+  "lightColor": "#f4f95e",
+  "darkColor": "#0e140f",
   "navigation": {
     "tabs": [
       {
@@ -27,7 +14,7 @@
           {
             "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "installation",
               "configuration",
               "deployment"
@@ -107,5 +94,37 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "MDX-powered content authoring with embedded React components",
+    "Document versioning to keep docs in sync with releases",
+    "Internationalization (i18n) with Crowdin integration",
+    "Rich plugin ecosystem (docs, blog, pages, sitemap, PWA, and more)",
+    "Swizzling system for fine-grained theme component customization",
+    "Built-in Algolia search integration",
+    "Static site generation with fast client-side navigation (SPA)",
+    "Scaffold CLI via create-docusaurus for instant project setup",
+    "Flexible deployment to GitHub Pages, Netlify, Vercel, and more",
+    "TypeScript support throughout"
+  ],
+  "publicApiSurface": [
+    "npx create-docusaurus@latest",
+    "docusaurus start",
+    "docusaurus build",
+    "docusaurus deploy",
+    "docusaurus swizzle",
+    "docusaurus serve",
+    "docusaurus clear",
+    "docusaurus write-translations",
+    "docusaurus write-heading-ids",
+    "@docusaurus/core: runCLI, build, start, deploy, serve, clear",
+    "@docusaurus/plugin-content-docs",
+    "@docusaurus/plugin-content-blog",
+    "@docusaurus/plugin-content-pages",
+    "@docusaurus/plugin-sitemap",
+    "@docusaurus/plugin-pwa",
+    "@docusaurus/theme-classic",
+    "@docusaurus/preset-classic",
+    "docusaurus.config.js (siteMetadata, themeConfig, presets, plugins, i18n, url, baseUrl)"
+  ]
 }

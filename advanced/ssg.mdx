@@ -1,0 +1,165 @@
+---
+title: "Docusaurus SSG: Pre-rendering, Hydration, and Browser APIs"
+description: "Learn how Docusaurus pre-renders React to static HTML, how hydration turns pages into an SPA, and how to safely use browser APIs like window and document."
+---
+
+Docusaurus generates static HTML files for every route by rendering your React theme components in a Node.js environment using React DOM Server. This process — called static site generation (SSG), or equivalently server-side rendering (SSR) in Docusaurus terminology — runs **before** the browser is ever involved. The resulting HTML files are what users and search engines see first; the browser then hydrates them into a full single-page application.
+
+<Note>
+Docusaurus uses "SSR" and "SSG" interchangeably in its codebase. Strictly speaking it is a static site generator: it pre-renders HTML at build time and deploys the files to a CDN. There is no server dynamically rendering pages at request time, which distinguishes it from frameworks like Next.js in SSR mode.
+</Note>
+
+## How the SSR pass works
+
+During `docusaurus build`, the bundler produces two separate outputs from the same theme source:
+
+<CardGroup cols={2}>
+  <Card title="Server bundle" icon="server">
+    Compiled for Node.js. Used during the SSG pass to call `renderToString()` on every route. Produces the `.html` files in `build/`. Never shipped to users.
+  </Card>
+  <Card title="Client bundle" icon="monitor">
+    Compiled for browsers. Split per route and loaded after the HTML file arrives. Provides all the interactive and dynamic behaviour of the site.
+  </Card>
+</CardGroup>
+
+During the SSG pass there is no `window`, no `document`, and no browser globals of any kind. Any component that references these values directly will throw a `ReferenceError` at build time:
+
+```jsx
+// This will crash during `docusaurus build`:
+export default function BadComponent() {
+  return <span>{window.location.href}</span>;
+}
+```
+
+```
+ReferenceError: window is not defined
+```
+
+## Hydration and the SPA transition
+
+These HTML files are the first thing that arrives in the user's browser. The main content is already visible — no JavaScript needs to run before the page is readable. Afterwards, the browser downloads and executes the client bundle.
+
+In a client-side-only React app, the HTML file contains only an empty `<div id="root">` and React builds the entire DOM from scratch in JavaScript. In a Docusaurus SSR app, React finds a fully-built DOM already in place and only needs to attach event listeners and synchronise its virtual DOM model. This step is called **hydration**.
+
+<Warning>
+The first client-side render must produce a DOM structure identical to what the server rendered. If it doesn't, React cannot hydrate correctly — it will either throw errors or silently attach handlers to the wrong elements. This means you cannot use `typeof window !== 'undefined'` as a render-time branch, because the first client render would produce different markup from the server render.
+
+Read [The Perils of Rehydration](https://www.joshwcomeau.com/react/the-perils-of-rehydration/) for a thorough explanation of this pitfall.
+</Warning>
+
+## Escape hatches for browser-only code
+
+Docusaurus provides several safe patterns for components that genuinely require the browser environment.
+
+### `<BrowserOnly>`
+
+Wrap browser-dependent components with `<BrowserOnly>` to render nothing during SSR and only render the real component after the first client render:
+
+```jsx
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+function MyComponent(props) {
+  return (
+    <BrowserOnly fallback={<div>Loading...</div>}>
+      {() => {
+        const LibComponent = require('some-lib-that-accesses-window').LibComponent;
+        return <LibComponent {...props} />;
+      }}
+    </BrowserOnly>
+  );
+}
+```
+
+The children of `<BrowserOnly>` must be a **function** that returns an element, not the element itself. This prevents the React renderer from evaluating browser globals during SSR even when the component is ultimately not rendered.
+
+### `useIsBrowser`
+
+When you need to conditionally compute a value — but don't need a completely different component tree — use the `useIsBrowser` hook. It returns `false` during SSR and `true` after the first client render:
+
+```jsx
+import useIsBrowser from '@docusaurus/useIsBrowser';
+
+function MyComponent() {
+  const isBrowser = useIsBrowser();
+  const location = isBrowser ? window.location.href : 'Loading…';
+  return <span>{location}</span>;
+}
+```
+
+### `useEffect`
+
+`useEffect` callbacks never run during SSR. Use them for side effects that must happen after mount, such as subscribing to browser events, measuring DOM elements, or importing browser-only libraries:
+
+```jsx
+import React, {useEffect} from 'react';
+
+function MyComponent() {
+  useEffect(() => {
+    // Runs only in the browser, after the component mounts
+    console.log('Mounted in browser, window is available');
+  }, []);
+
+  return <span>Some content</span>;
+}
+```
+
+### `ExecutionEnvironment`
+
+The `ExecutionEnvironment` module provides a `canUseDOM` flag that is `true` in the browser and `false` during SSR. Use it for **imperative** browser code outside of React rendering — for example, in client modules or utility functions. Do not use it to conditionally return different JSX, or you will hit the hydration mismatch problem described above.
+
+```js title="a-client-module.js"
+import ExecutionEnvironment from '@docusaurus/ExecutionEnvironment';
+
+if (ExecutionEnvironment.canUseDOM) {
+  // Safe: this only runs in the browser, not during SSR
+  document.title = 'Page loaded!';
+}
+```
+
+## Comparison of escape hatches
+
+<AccordionGroup>
+  <Accordion title="When to use BrowserOnly">
+    Use `<BrowserOnly>` when an entire component cannot render server-side at all — for example, a rich code editor that imports `window`-dependent libraries. Provide a meaningful `fallback` so the layout does not shift when the real component mounts.
+  </Accordion>
+  <Accordion title="When to use useIsBrowser">
+    Use `useIsBrowser` when the component structure is the same in both environments but a specific value or class name depends on the browser. Keeps the component tree stable, minimising hydration risk.
+  </Accordion>
+  <Accordion title="When to use useEffect">
+    Use `useEffect` for side effects that interact with the DOM or browser APIs after mount, such as attaching event listeners, reading scroll position, or lazy-loading a third-party script.
+  </Accordion>
+  <Accordion title="When to use ExecutionEnvironment.canUseDOM">
+    Use `ExecutionEnvironment.canUseDOM` in non-React code — client modules, utility files, plugin-provided client-side JS — where you need a synchronous, non-hook guard around browser API calls.
+  </Accordion>
+</AccordionGroup>
+
+## `process.env.NODE_ENV` exception
+
+`process.env.NODE_ENV` is the one "Node global" that is safe to use in theme code. Webpack replaces it at bundle time with the literal string `'development'` or `'production'`, allowing dead-code elimination:
+
+<Tabs>
+  <Tab title="Development build">
+    ```jsx
+    export default function ExpensiveComp() {
+      if ('development' === 'development') {
+        return <>Skipped in development</>;
+      }
+      // Dead code — removed by bundler
+      const res = someExpensiveOperation();
+      return <>{res}</>;
+    }
+    ```
+  </Tab>
+  <Tab title="Production build">
+    ```jsx
+    export default function ExpensiveComp() {
+      // Dead code — removed by bundler
+      // if ('production' === 'development') { ... }
+      const res = someExpensiveOperation();
+      return <>{res}</>;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+This pattern is safe because Webpack injects the value before SSR runs, so `process.env.NODE_ENV` is never actually read as a Node global in the browser bundle.

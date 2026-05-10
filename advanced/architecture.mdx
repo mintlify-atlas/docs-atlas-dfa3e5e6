@@ -1,0 +1,140 @@
+---
+title: "Docusaurus Architecture: How the Build Pipeline Works"
+description: "Understand how Docusaurus loads content, generates routes, bundles assets, and renders static HTML — from plugin execution to final output."
+---
+
+Docusaurus is built around a clean separation between **content plugins**, **themes**, and the **bundler**. Plugins run in Node.js to collect content and emit route data; themes supply the React components that render that data; the Webpack (or Rspack) bundler ties everything together into client and server bundles. Understanding these three layers — and how they communicate — makes it much easier to debug builds, write custom plugins, and extend the framework.
+
+## The three layers
+
+<CardGroup cols={3}>
+  <Card title="Content plugins" icon="database">
+    Run in Node.js. Load files from disk, transform them, and register routes and global data via lifecycle actions like `loadContent` and `contentLoaded`.
+  </Card>
+  <Card title="Theme" icon="paintbrush">
+    Compiled by Webpack. Provides the React components (`@theme/DocPage`, `@theme/BlogPostPage`, etc.) that receive route props and render HTML.
+  </Card>
+  <Card title="Bundler" icon="package">
+    Takes the theme's component tree and produces a server bundle (for SSG) and a client bundle (for the SPA). Webpack is the default; Rspack is available as a faster alternative.
+  </Card>
+</CardGroup>
+
+<Note>
+Plugin code and theme code never import each other directly. They communicate through JSON temp files written to `.docusaurus/` and through calls to `addRoute`. Think of plugins as if they were written in a completely different language — the only bridge is the generated data.
+</Note>
+
+## The build pipeline
+
+The Docusaurus build executes in four distinct phases. Each phase feeds its output into the next.
+
+<Steps>
+  <Step title="Content loading">
+    Every plugin's `loadContent()` lifecycle method runs in Node.js. Plugins read source files (Markdown, JSON, any format they understand) and return a content object. For the docs plugin, this means scanning `docs/` and building the full document tree with sidebar metadata, versions, and tags.
+
+    After individual content loading, each plugin's `contentLoaded()` runs. Here plugins call `addRoute()` to register pages and `createData()` to write serialised JSON props into `.docusaurus/`. The `allContentLoaded()` lifecycle then fires once, giving every plugin access to every other plugin's content — useful for cross-plugin features like a global search index.
+  </Step>
+  <Step title="Route generation">
+    All routes registered through `addRoute` are aggregated into `.docusaurus/routes.js`. Each route entry pairs a URL path with a component path and a set of prop modules that Webpack will lazy-load. Nested routes are supported: the docs plugin uses them to wrap individual doc pages inside a `DocPage` layout that provides the sidebar and version context.
+
+    Duplicate routes are detected at this stage and reported according to the `onDuplicateRoutes` config option.
+  </Step>
+  <Step title="Bundling">
+    Webpack processes the theme components. It applies the `@theme` alias resolution, which layers user swizzles over theme-package components over Docusaurus core fallbacks. The bundler produces two outputs:
+
+    - A **server bundle** — a Node-runnable build used exclusively during SSG to render HTML.
+    - A **client bundle** — the JavaScript shipped to users' browsers, split per route so that only the code needed for the current page is downloaded.
+  </Step>
+  <Step title="Static site generation (SSG)">
+    Docusaurus iterates over every route path and renders it to HTML using React DOM Server's `renderToString`. The resulting HTML files are written to `build/`. The client bundle's `<script>` tags are injected so browsers can hydrate the static markup into a full SPA after load.
+  </Step>
+</Steps>
+
+## Monorepo package structure
+
+The Docusaurus monorepo lives under `packages/`. The packages most relevant to the build pipeline are:
+
+<AccordionGroup>
+  <Accordion title="@docusaurus/core">
+    The CLI and runtime host. Contains the server-side build orchestration (`packages/docusaurus/src/server/`), the client entry point (`src/client/clientEntry.tsx`), the `App` component, and the `PendingNavigation` router wrapper. This is the package that ties everything else together.
+  </Accordion>
+  <Accordion title="@docusaurus/plugin-content-docs / blog / pages">
+    The three primary content plugins. Each implements `loadContent` and `contentLoaded` to turn Markdown files into routes. The docs plugin is the most complex: it handles versioning, sidebars, category indexes, and nested route trees.
+  </Accordion>
+  <Accordion title="@docusaurus/theme-classic">
+    The default theme. Exports the complete set of `@theme/*` components — `Navbar`, `Footer`, `DocPage`, `BlogPostPage`, `MDXPage`, and dozens more. Built on the Infima.css design system with CSS Modules.
+  </Accordion>
+  <Accordion title="@docusaurus/theme-common">
+    Headless utilities and hooks shared across themes: `useThemeConfig`, `useColorMode`, `usePrismTheme`, and more. Deliberately has no styling opinions so it can be used by any theme implementation.
+  </Accordion>
+  <Accordion title="@docusaurus/bundler">
+    An abstraction layer over Webpack and Rspack. Normalises their APIs so the rest of Docusaurus can call a single `createBundler()` function without caring which bundler is active.
+  </Accordion>
+  <Accordion title="@docusaurus/types">
+    Shared TypeScript definitions: `DocusaurusConfig`, `Plugin`, `RouteConfig`, `LoadContext`, `ClientModule`, and every other public type. Import from here when writing plugins or custom theme components.
+  </Accordion>
+</AccordionGroup>
+
+## Plugin lifecycle overview
+
+Plugins are plain functions that receive a `context` (site config, generated files directory, i18n state) and an `options` object, and return a lifecycle object.
+
+```js title="my-plugin/index.js"
+export default async function myPlugin(context, options) {
+  return {
+    name: 'my-plugin',
+
+    async loadContent() {
+      // Read files, call APIs, etc.
+      // Return any serialisable value — this becomes `content` below.
+      return {items: await fetchItems()};
+    },
+
+    async contentLoaded({content, actions}) {
+      const {createData, addRoute, setGlobalData} = actions;
+
+      // Write a JSON file into .docusaurus/ that Webpack will require()
+      const dataPath = await createData(
+        'items.json',
+        JSON.stringify(content.items),
+      );
+
+      // Register a route — the component receives `items` as a prop
+      addRoute({
+        path: '/my-page',
+        component: '@site/src/components/MyPage',
+        modules: {items: dataPath},
+        exact: true,
+      });
+
+      // Or expose data globally to any component via useDocusaurusContext
+      setGlobalData({totalItems: content.items.length});
+    },
+  };
+}
+```
+
+The lifecycle execution order inside `loadPlugins` (`packages/docusaurus/src/server/plugins/plugins.ts`) is:
+
+1. All plugins run `loadContent()` in parallel.
+2. All plugins run `contentLoaded()` in parallel.
+3. All plugins run `allContentLoaded()` in parallel, each receiving every other plugin's loaded content.
+4. Routes and global data from both phases are merged and sorted.
+
+<Tip>
+Because plugins run in Node.js, you can use any Node API — `fs`, `path`, network calls, native addons — inside `loadContent`. The constraint is that everything you pass to `createData` or `setGlobalData` must be JSON-serialisable, because it will cross the Node-to-browser boundary.
+</Tip>
+
+## Config serialisation
+
+During bundling, `docusaurus.config.js` is serialised with `JSON.stringify` and embedded in the client bundle. This means only **serialisable values** survive to the browser. Functions, `RegExp` instances, and `Symbol` values are silently dropped. Keep `themeConfig` entirely serialisable — the type definitions in `@docusaurus/types` enforce this.
+
+The serialised config is accessible anywhere in theme code through the `useDocusaurusContext()` hook:
+
+```jsx title="src/components/MyBanner.jsx"
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+
+export default function MyBanner() {
+  const {siteConfig} = useDocusaurusContext();
+  return <p>Welcome to {siteConfig.title}</p>;
+}
+```

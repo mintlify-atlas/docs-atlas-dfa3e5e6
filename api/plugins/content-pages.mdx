@@ -1,0 +1,178 @@
+---
+title: "plugin-content-pages: Pages Plugin Configuration Reference"
+description: "Complete option reference for @docusaurus/plugin-content-pages covering path, routeBasePath, MDX component, include/exclude globs, and front matter fields."
+---
+
+`@docusaurus/plugin-content-pages` turns React components, TypeScript files, and MDX documents found in `src/pages/` into standalone website pages. Each file in the configured directory becomes a route, with the URL derived from the file's path. This plugin is included in `@docusaurus/preset-classic` and does not require a separate installation when using that preset.
+
+## Installation
+
+```bash npm2yarn
+npm install --save @docusaurus/plugin-content-pages
+```
+
+<Tip>
+If you use `@docusaurus/preset-classic`, configure this plugin through the `pages` preset key instead of adding it to the `plugins` array.
+</Tip>
+
+## Configuration options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `path` | `string` | `'src/pages'` | Path to the pages content directory on the filesystem, relative to the site directory. All components in this directory are automatically converted to pages. |
+| `routeBasePath` | `string` | `'/'` | URL route prefix for all pages. Do **not** include a trailing slash. |
+| `include` | `string[]` | `['**/*.{js,jsx,ts,tsx,md,mdx}']` | Glob patterns for files that will be turned into pages. |
+| `exclude` | `string[]` | see example | Glob patterns for files to exclude. Files matching these patterns will not generate routes. |
+| `mdxPageComponent` | `string` | `'@theme/MDXPage'` | Theme component used to render each MDX page. |
+| `editUrl` | `string \| EditUrlFn` | `undefined` | **Markdown pages only.** Base URL for "Edit this page" links. A function receives `{blogDirPath, blogPath, permalink, locale}`. Omit to disable edit links. |
+| `editLocalizedFiles` | `boolean` | `false` | **Markdown pages only.** When `true`, edit links target the localized file. Ignored when `editUrl` is a function. |
+| `showLastUpdateAuthor` | `boolean` | `false` | **Markdown pages only.** Display the author of the last git commit for the page. |
+| `showLastUpdateTime` | `boolean` | `false` | **Markdown pages only.** Display the date of the last git commit. Requires full git history. |
+| `remarkPlugins` | `any[]` | `[]` | Remark plugins passed to the MDX processor. |
+| `rehypePlugins` | `any[]` | `[]` | Rehype plugins passed to the MDX processor. |
+| `recmaPlugins` | `any[]` | `[]` | Recma plugins passed to the MDX processor. |
+| `beforeDefaultRemarkPlugins` | `any[]` | `[]` | Remark plugins injected before Docusaurus's built-in Remark plugins. |
+| `beforeDefaultRehypePlugins` | `any[]` | `[]` | Rehype plugins injected before Docusaurus's built-in Rehype plugins. |
+
+## Type definitions
+
+### `EditUrlFn`
+
+```ts
+type EditUrlFunction = (params: {
+  blogDirPath: string;
+  blogPath: string;
+  permalink: string;
+  locale: string;
+}) => string | undefined;
+```
+
+## Default exclude patterns
+
+By default the plugin excludes files that are not meant to become pages directly:
+
+```js
+exclude: [
+  '**/_*.{js,jsx,ts,tsx,md,mdx}', // files starting with underscore
+  '**/_*/**',                       // directories starting with underscore
+  '**/*.test.{js,jsx,ts,tsx}',      // test files
+  '**/__tests__/**',                // test directories
+]
+```
+
+<Info>
+Files starting with an underscore (`_`) are treated as partials or shared components and are excluded from routing by default. Import them from other page files as needed.
+</Info>
+
+## Example configuration
+
+<Tabs>
+  <Tab title="Preset options (recommended)">
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        pages: {
+          path: 'src/pages',
+          routeBasePath: '/',
+          include: ['**/*.{js,jsx,ts,tsx,md,mdx}'],
+          exclude: [
+            '**/_*.{js,jsx,ts,tsx,md,mdx}',
+            '**/_*/**',
+            '**/*.test.{js,jsx,ts,tsx}',
+            '**/__tests__/**',
+          ],
+          mdxPageComponent: '@theme/MDXPage',
+        },
+      },
+    ],
+  ],
+};
+```
+
+  </Tab>
+  <Tab title="Standalone plugin">
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: [
+    [
+      '@docusaurus/plugin-content-pages',
+      {
+        id: 'landing',
+        path: 'src/landing',
+        routeBasePath: '/',
+      },
+    ],
+  ],
+};
+```
+
+  </Tab>
+</Tabs>
+
+## How routing works
+
+The URL for each page is derived from its file path relative to the `path` directory:
+
+| File | URL |
+|------|-----|
+| `src/pages/index.js` | `/` |
+| `src/pages/about.mdx` | `/about` |
+| `src/pages/team/members.tsx` | `/team/members` |
+| `src/pages/_partial.mdx` | *(excluded — no route)* |
+
+## React pages
+
+A React page is any `.js`, `.jsx`, `.ts`, or `.tsx` file that exports a default React component:
+
+```tsx title="src/pages/hello.tsx"
+import Layout from '@theme/Layout';
+
+export default function HelloPage() {
+  return (
+    <Layout title="Hello" description="A simple page">
+      <main>
+        <h1>Hello!</h1>
+      </main>
+    </Layout>
+  );
+}
+```
+
+## Markdown front matter
+
+MDX pages support the following front matter fields.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `title` | `string` | Markdown heading | Page title used in `<title>` and `og:title`. |
+| `description` | `string` | first line of content | `<meta name="description">` and OpenGraph description. |
+| `keywords` | `string[]` | `undefined` | `<meta name="keywords">` content for search engines. |
+| `image` | `string` | `undefined` | OpenGraph `og:image` URL for social link previews. |
+| `slug` | `string` | file path | Custom URL path for this page. |
+| `wrapperClassName` | `string` | `undefined` | CSS class added to the page wrapper element for targeted styling. |
+| `hide_table_of_contents` | `boolean` | `false` | Hide the table of contents panel. |
+| `draft` | `boolean` | `false` | Draft pages are only available in development. |
+| `unlisted` | `boolean` | `false` | Unlisted pages are hidden from navigation and sitemaps but accessible via direct URL. |
+
+```md title="src/pages/about.md"
+---
+title: About Us
+description: Learn about the team behind this project.
+wrapperClassName: about-page
+hide_table_of_contents: true
+slug: /about
+---
+
+# About Us
+
+Page content here.
+```
+
+## i18n
+
+Translated pages live under `website/i18n/[locale]/docusaurus-plugin-content-pages/`. For multi-instance setups the folder is `docusaurus-plugin-content-pages-[pluginId]`.

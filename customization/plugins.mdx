@@ -1,0 +1,251 @@
+---
+title: "Extend Docusaurus with Plugins and Presets"
+description: "Install, configure, and write Docusaurus plugins and presets to add docs, blogs, sitemaps, analytics, and custom functionality to your site."
+---
+
+Docusaurus is built entirely around plugins — the core framework provides no features of its own. Every route on your site exists because a plugin created it. The docs section comes from `@docusaurus/plugin-content-docs`, the blog from `@docusaurus/plugin-content-blog`, and individual pages from `@docusaurus/plugin-content-pages`. Understanding plugins and presets is the key to understanding how to extend and configure your site.
+
+## Plugins vs. presets
+
+A **plugin** is a single npm package that adds one capability to your site. A **preset** is a bundle of plugins and themes distributed together. Rather than configuring `@docusaurus/plugin-content-docs`, `@docusaurus/plugin-content-blog`, `@docusaurus/plugin-sitemap`, and others one by one, the `@docusaurus/preset-classic` preset lets you configure all of them in one place.
+
+Most new Docusaurus sites use `preset-classic` and rarely need to add standalone plugins directly — unless they need something that the preset doesn't include.
+
+## Installing a plugin
+
+Plugins are npm packages. Install them the same way you install any other dependency:
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install --save docusaurus-plugin-name
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add docusaurus-plugin-name
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```bash
+    pnpm add docusaurus-plugin-name
+    ```
+  </Tab>
+</Tabs>
+
+After installing, register the plugin in `docusaurus.config.js`:
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: ['@docusaurus/plugin-content-pages'],
+};
+```
+
+Docusaurus also supports loading plugins from a local path relative to the config file:
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: ['./src/plugins/docusaurus-local-plugin'],
+};
+```
+
+## Configuring plugin options
+
+Plugins accept options through a two-element tuple — the plugin name (or path) paired with an options object. This pattern is sometimes called "Babel style":
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: [
+    [
+      '@docusaurus/plugin-xxx',
+      {
+        /* options */
+      },
+    ],
+  ],
+};
+```
+
+A realistic example with multiple plugins:
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: [
+    // Basic usage — no options needed
+    '@docusaurus/plugin-debug',
+
+    // With options
+    [
+      '@docusaurus/plugin-sitemap',
+      {
+        changefreq: 'weekly',
+      },
+    ],
+  ],
+};
+```
+
+## Multi-instance plugins
+
+Some plugins, including the docs and blog plugins, can be registered more than once. Each instance requires a unique `id`:
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: [
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'docs-1',
+        path: 'docs',
+        routeBasePath: 'docs',
+      },
+    ],
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'docs-2',
+        path: 'community',
+        routeBasePath: 'community',
+      },
+    ],
+  ],
+};
+```
+
+<Note>
+At most one plugin instance can omit the `id` (or use `id: 'default'`). That instance becomes the "default" instance.
+</Note>
+
+## The `@docusaurus/preset-classic` preset
+
+The classic preset is the standard starting point for new Docusaurus sites. It bundles the following packages:
+
+<CardGroup cols={2}>
+  <Card title="@docusaurus/theme-classic" icon="paintbrush">
+    The default theme — Navbar, Footer, sidebar, color mode toggle, and all UI components.
+  </Card>
+  <Card title="@docusaurus/plugin-content-docs" icon="book">
+    Docs plugin — versioning, sidebar generation, and MDX rendering for documentation pages.
+  </Card>
+  <Card title="@docusaurus/plugin-content-blog" icon="rss">
+    Blog plugin — post listing, tags, authors, and RSS/Atom feed generation.
+  </Card>
+  <Card title="@docusaurus/plugin-content-pages" icon="file">
+    Pages plugin — renders React and MDX files from the `src/pages` directory as standalone routes.
+  </Card>
+  <Card title="@docusaurus/plugin-sitemap" icon="map">
+    Generates `sitemap.xml` automatically for production builds.
+  </Card>
+  <Card title="@docusaurus/theme-search-algolia" icon="magnifying-glass">
+    Algolia DocSearch integration for full-text site search.
+  </Card>
+</CardGroup>
+
+The preset also includes `@docusaurus/plugin-debug`, `@docusaurus/plugin-google-gtag`, `@docusaurus/plugin-google-tag-manager`, and `@docusaurus/plugin-svgr`.
+
+### Configuring the preset
+
+Each option key in the preset config maps directly to the corresponding plugin or theme. Pass `false` to disable a plugin entirely:
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        // Passed to @docusaurus/theme-classic
+        theme: {
+          customCss: ['./src/css/custom.css'],
+        },
+        // Passed to @docusaurus/plugin-content-docs
+        docs: {
+          sidebarPath: './sidebars.js',
+        },
+        // Passed to @docusaurus/plugin-content-blog
+        blog: {
+          showReadingTime: true,
+        },
+        // Passed to @docusaurus/plugin-content-pages
+        pages: {},
+        // Passed to @docusaurus/plugin-sitemap
+        sitemap: {
+          changefreq: 'weekly',
+        },
+        // Disable the blog entirely
+        // blog: false,
+      },
+    ],
+  ],
+};
+```
+
+### Installing the preset separately
+
+If you created your site without the classic preset, install it manually:
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install --save @docusaurus/preset-classic
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add @docusaurus/preset-classic
+    ```
+  </Tab>
+</Tabs>
+
+## Module shorthands
+
+Docusaurus supports shorthand resolution for plugin, theme, and preset names. When you write a short name, Docusaurus tries the following names in order (shown here for the `plugins` field):
+
+| Short name | Resolved as |
+|---|---|
+| `sitemap` | `@docusaurus/plugin-sitemap` |
+| `awesome` | `docusaurus-plugin-awesome` |
+| `@my-company` | `@my-company/docusaurus-plugin` |
+| `@my-company/awesome` | `@my-company/docusaurus-plugin-awesome` |
+
+The resolution order is `[name]` → `@docusaurus/[type]-[name]` → `docusaurus-[type]-[name]`, where `[type]` is `plugin`, `theme`, or `preset` depending on which config field the name appears in.
+
+## Writing a local plugin
+
+If the community doesn't have what you need, you can write a plugin directly in your repository. A plugin is a function that receives the Docusaurus context and your options, and returns a plugin object:
+
+```js title="src/plugins/my-plugin.js"
+export default function myPlugin(context, options) {
+  return {
+    name: 'my-plugin',
+
+    async loadContent() {
+      // Load data from any source
+      return {message: 'Hello from my plugin'};
+    },
+
+    async contentLoaded({content, actions}) {
+      // Use actions.addRoute, actions.setGlobalData, etc.
+    },
+
+    injectHtmlTags() {
+      return {
+        headTags: [],
+        preBodyTags: [],
+        postBodyTags: [],
+      };
+    },
+  };
+}
+```
+
+Register it in your config with a relative path:
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: ['./src/plugins/my-plugin'],
+};
+```
+
+<Info>
+Local plugins follow the same lifecycle API as published plugins. See the [plugin method references](https://docusaurus.io/docs/api/plugin-methods) for the full list of lifecycle hooks including `loadContent`, `contentLoaded`, `configureWebpack`, and more.
+</Info>

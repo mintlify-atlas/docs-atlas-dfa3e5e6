@@ -1,0 +1,222 @@
+---
+title: "Styling and Layout in Docusaurus"
+description: "Apply global CSS, use CSS Modules for scoped styles, override Infima CSS variables, customize dark mode, and add Sass/SCSS support in your Docusaurus site."
+---
+
+A Docusaurus site is a pre-rendered single-page React application, so you can style it using any approach that works in a React project. This guide covers the three most common patterns: global CSS, CSS Modules, and Infima CSS variable overrides. All three can be combined freely.
+
+## Global CSS
+
+Global CSS is the simplest approach. Create a stylesheet and register it through the classic theme's `customCss` option:
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        theme: {
+          customCss: ['./src/css/custom.css'],
+        },
+      },
+    ],
+  ],
+};
+```
+
+Any class defined in this file is available globally:
+
+```css title="src/css/custom.css"
+.purple-text {
+  color: rebeccapurple;
+}
+```
+
+```jsx
+function MyComponent() {
+  return (
+    <main>
+      <h1 className="purple-text">Purple Heading!</h1>
+    </main>
+  );
+}
+```
+
+### CSS class name types
+
+When inspecting the DOM, you will encounter three categories of class names:
+
+<AccordionGroup>
+  <Accordion title="Theme class names">
+    Stable, theme-agnostic class names like `main-wrapper` and `docSidebarContainer`. These are the safest to target in custom CSS because they are guaranteed not to change. Prefer these over Infima or CSS Module class names.
+  </Accordion>
+  <Accordion title="Infima class names">
+    BEM-style names like `navbar__item` or `button--primary`. These are relatively stable but are considered implementation details. Prefer overriding Infima CSS variables rather than targeting these class names directly.
+  </Accordion>
+  <Accordion title="CSS Module class names">
+    Hashed class names like `codeBlockContainer_RIuc`. These are implementation details that may change between releases. Avoid targeting them. If necessary, use an attribute selector that ignores the hash: `[class*='codeBlockContainer']`.
+  </Accordion>
+</AccordionGroup>
+
+## Infima CSS variables
+
+`@docusaurus/preset-classic` is built on [Infima](https://infima.dev/), a CSS framework that exposes design tokens as CSS custom properties. Override them in `src/css/custom.css` to change colors, typography, and spacing site-wide:
+
+```css title="src/css/custom.css"
+:root {
+  --ifm-color-primary: #25c2a0;
+  --ifm-color-primary-dark: #21af90;
+  --ifm-color-primary-darker: #1fa588;
+  --ifm-color-primary-darkest: #1a8870;
+  --ifm-color-primary-light: #29d5b0;
+  --ifm-color-primary-light-lighter: #32d8b4;
+  --ifm-color-primary-lightest: #4fddbf;
+  --ifm-code-font-size: 95%;
+}
+```
+
+Infima uses seven shades per color. Use a tool like [ColorBox](https://www.colorbox.io/) to generate a complete color scale for your chosen primary color, then paste the variables above.
+
+<Tip>
+  The `create-docusaurus` scaffolding includes a color generator in the generated site. You can also find an interactive color picker in the official Docusaurus documentation.
+</Tip>
+
+## Dark mode
+
+The `<html>` element carries a `data-theme` attribute that switches between `"light"` and `"dark"`. Scope your CSS to a specific mode using attribute selectors:
+
+```css title="src/css/custom.css"
+/* Override primary color in dark mode */
+[data-theme='dark'] {
+  --ifm-color-primary: #4e89e8;
+}
+
+/* Style a specific class only in dark mode */
+[data-theme='dark'] .purple-text {
+  color: plum;
+}
+```
+
+You can also initialize the theme via a query string parameter for testing: append `?docusaurus-theme=dark` or `?docusaurus-theme=light` to any page URL.
+
+## CSS Modules
+
+CSS Modules scope styles to the component that imports them, preventing class name collisions across your site. Name your stylesheet with the `.module.css` suffix:
+
+```css title="src/components/Widget/styles.module.css"
+.main {
+  padding: 12px;
+}
+
+.heading {
+  font-weight: bold;
+}
+
+.contents {
+  color: #ccc;
+}
+```
+
+```jsx title="src/components/Widget/index.jsx"
+import styles from './styles.module.css';
+
+function Widget() {
+  return (
+    <main className={styles.main}>
+      <h1 className={styles.heading}>Hello!</h1>
+      <article className={styles.contents}>Lorem Ipsum</article>
+    </main>
+  );
+}
+```
+
+Webpack transforms the class names into globally unique hashes at build time, so `.main` becomes something like `.main_aB3Kd`. You import the transformed name through the `styles` object — the mapping is handled automatically.
+
+## Sass/SCSS
+
+Sass is not built in, but the community plugin `docusaurus-plugin-sass` adds support for both global and module Sass stylesheets:
+
+<Steps>
+  <Step title="Install the plugin">
+    ```bash
+    npm install --save docusaurus-plugin-sass sass
+    ```
+  </Step>
+  <Step title="Register the plugin">
+    ```js title="docusaurus.config.js"
+    export default {
+      plugins: ['docusaurus-plugin-sass'],
+    };
+    ```
+  </Step>
+  <Step title="Use Sass for global styles">
+    Point `customCss` at a `.scss` file:
+
+    ```js title="docusaurus.config.js"
+    export default {
+      presets: [
+        [
+          '@docusaurus/preset-classic',
+          {
+            theme: {
+              customCss: ['./src/css/custom.scss'],
+            },
+          },
+        ],
+      ],
+    };
+    ```
+  </Step>
+  <Step title="Use Sass for CSS Modules">
+    Name module stylesheets with `.module.scss`:
+
+    ```scss title="src/components/Widget/styles.module.scss"
+    .main {
+      padding: 12px;
+
+      article {
+        color: #ccc;
+      }
+    }
+    ```
+
+    ```jsx
+    import styles from './styles.module.scss';
+    ```
+  </Step>
+</Steps>
+
+## Responsive design
+
+Docusaurus uses `996px` as the breakpoint between mobile and desktop views. Use media queries to adapt your custom styles:
+
+```css title="src/css/custom.css"
+.banner {
+  padding: 4rem;
+}
+
+/* Reduce padding on mobile */
+@media screen and (max-width: 996px) {
+  .banner {
+    padding: 2rem;
+  }
+}
+```
+
+## CSS-in-JS
+
+<Warning>
+  CSS-in-JS support in Docusaurus is a work in progress. Libraries like MUI may exhibit display quirks because of how Docusaurus handles server-side rendering. Use global CSS or CSS Modules for stable styling.
+</Warning>
+
+## Data attributes for conditional styles
+
+You can inject custom `data-*` attributes onto the `<html>` element via query string parameters following the `docusaurus-data-<key>` pattern. This makes it possible to style a page differently based on the URL, which is useful for embedding Docusaurus pages in iframes:
+
+```css title="src/css/custom.css"
+html[data-navbar='false'] .navbar {
+  display: none;
+}
+```
+
+Append `?docusaurus-data-navbar=false` to any page URL to activate the style.

@@ -1,0 +1,427 @@
+---
+title: "Configure a Docusaurus Site with docusaurus.config.js"
+description: "Learn every key field in docusaurus.config.js — site metadata, presets, plugins, themeConfig, i18n — with a complete realistic configuration example."
+---
+
+`docusaurus.config.js` is the single source of truth for your Docusaurus site. Rather than scattering settings across many files, Docusaurus centralizes everything — URLs, navigation, plugins, theming, and internationalization — in one place. This makes it easy for contributors to understand and customize the site without hunting through the codebase.
+
+## File format
+
+The config file runs in Node.js and can export a plain object, a function, or an async function. All four styles below produce identical results:
+
+<Tabs>
+  <Tab title="ES module (default)">
+    ```js title="docusaurus.config.js"
+    export default {
+      title: 'My Site',
+      url: 'https://my-site.example.com',
+    };
+    ```
+  </Tab>
+  <Tab title="CommonJS">
+    ```js title="docusaurus.config.js"
+    module.exports = {
+      title: 'My Site',
+      url: 'https://my-site.example.com',
+    };
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```ts title="docusaurus.config.ts"
+    import type {Config} from '@docusaurus/types';
+
+    export default {
+      title: 'My Site',
+      url: 'https://my-site.example.com',
+    } satisfies Config;
+    ```
+  </Tab>
+  <Tab title="Async function">
+    ```js title="docusaurus.config.js"
+    export default async function createConfigAsync() {
+      // Useful for importing ESM-only packages (e.g. Remark plugins)
+      const remarkPlugin = await import('some-remark-plugin');
+      return {
+        title: 'My Site',
+        url: 'https://my-site.example.com',
+      };
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  You must use `export default` (ES modules) or `module.exports` (CommonJS) to export the config. Named exports are not supported.
+</Note>
+
+## Site metadata
+
+These fields describe who you are and where the site lives. They are used in page titles, browser tabs, social sharing cards, and to resolve static asset paths correctly.
+
+<AccordionGroup>
+  <Accordion title="title">
+    **Type:** `string`
+
+    The name of your site. Appears in the browser tab, navbar, and as the HTML `<title>` suffix.
+
+    ```js
+    title: 'Acme Docs',
+    ```
+  </Accordion>
+  <Accordion title="tagline">
+    **Type:** `string`
+
+    A short description shown on the home page and in social sharing metadata.
+
+    ```js
+    tagline: 'Build and ship docs in minutes.',
+    ```
+  </Accordion>
+  <Accordion title="url">
+    **Type:** `string`
+
+    The root URL of your deployed site, **without** a trailing slash. Required for generating correct canonical URLs and sitemap entries.
+
+    ```js
+    url: 'https://my-site.example.com',
+    ```
+
+    For a site served at `https://my-org.com/my-project/`, the value is `https://my-org.com`.
+  </Accordion>
+  <Accordion title="baseUrl">
+    **Type:** `string`
+
+    The path prefix for the site, **with** a trailing slash. Set to `'/'` when the site is at the domain root. Set to `'/my-project/'` when served from a subpath.
+
+    ```js
+    baseUrl: '/',
+    ```
+  </Accordion>
+  <Accordion title="favicon">
+    **Type:** `string`
+
+    Path to the favicon, relative to the `static/` directory.
+
+    ```js
+    favicon: 'img/favicon.ico',
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Deployment configuration
+
+These fields are used by the `docusaurus deploy` command when publishing to GitHub Pages. You can also set them via environment variables (`ORGANIZATION_NAME`, `PROJECT_NAME`, `DEPLOYMENT_BRANCH`).
+
+<AccordionGroup>
+  <Accordion title="organizationName">
+    **Type:** `string`
+
+    The GitHub user or organization that owns the deployment repository.
+
+    ```js
+    organizationName: 'facebook',
+    ```
+  </Accordion>
+  <Accordion title="projectName">
+    **Type:** `string`
+
+    The name of the GitHub repository to deploy to.
+
+    ```js
+    projectName: 'docusaurus',
+    ```
+  </Accordion>
+  <Accordion title="deploymentBranch">
+    **Type:** `string`
+
+    The branch that GitHub Pages serves from. Defaults to `'gh-pages'` for project repositories (those whose `projectName` does not end in `.github.io`).
+
+    ```js
+    deploymentBranch: 'gh-pages',
+    ```
+  </Accordion>
+  <Accordion title="trailingSlash">
+    **Type:** `boolean | undefined`
+
+    Controls whether URLs end with a trailing slash and how output HTML files are named. Different static hosts handle trailing slashes differently, so setting an explicit value avoids 404s and redirect chains. Recommended when deploying to GitHub Pages or Netlify.
+
+    ```js
+    trailingSlash: false,
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Presets, plugins, and themes
+
+Docusaurus functionality is provided through plugins. A **preset** is a convenient bundle of plugins and themes — `@docusaurus/preset-classic` is the standard starting point.
+
+### Using presets
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        docs: {
+          sidebarPath: './sidebars.js',
+        },
+        blog: {
+          showReadingTime: true,
+        },
+        theme: {
+          customCss: ['./src/css/custom.css'],
+        },
+      },
+    ],
+  ],
+};
+```
+
+### Adding individual plugins
+
+If you need a plugin that is not included in your preset, add it to the `plugins` array:
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: [
+    [
+      '@docusaurus/plugin-content-blog',
+      {
+        path: 'blog',
+        routeBasePath: 'blog',
+        include: ['*.md', '*.mdx'],
+      },
+    ],
+    '@docusaurus/plugin-content-pages',
+  ],
+};
+```
+
+<Tip>
+  Docusaurus supports **module shorthands** — you can drop the `@docusaurus/plugin-content-` and `@docusaurus/theme-` prefixes:
+
+  ```js
+  plugins: ['content-blog', 'content-pages'],
+  themes: ['classic'],
+  ```
+</Tip>
+
+### Loading local plugins
+
+Point to a directory containing the plugin source:
+
+```js title="docusaurus.config.js"
+import path from 'path';
+
+export default {
+  plugins: [path.resolve(__dirname, './my-local-plugin')],
+};
+```
+
+## themeConfig
+
+`themeConfig` controls the visual appearance and behavior of the classic theme: the navbar, footer, color mode, and more.
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    navbar: {
+      title: 'My Site',
+      logo: {
+        alt: 'My Site Logo',
+        src: 'img/logo.svg',
+      },
+      items: [
+        {
+          type: 'docSidebar',
+          sidebarId: 'tutorialSidebar',
+          position: 'left',
+          label: 'Docs',
+        },
+        {to: '/blog', label: 'Blog', position: 'left'},
+        {
+          href: 'https://github.com/my-org/my-project',
+          label: 'GitHub',
+          position: 'right',
+        },
+      ],
+    },
+    footer: {
+      style: 'dark',
+      links: [
+        {
+          title: 'Docs',
+          items: [
+            {label: 'Getting started', to: '/docs/intro'},
+          ],
+        },
+        {
+          title: 'Community',
+          items: [
+            {label: 'GitHub', href: 'https://github.com/my-org/my-project'},
+          ],
+        },
+      ],
+      copyright: `Copyright © ${new Date().getFullYear()} My Organization.`,
+    },
+    colorMode: {
+      defaultMode: 'light',
+      disableSwitch: false,
+      respectPrefersColorScheme: true,
+    },
+  },
+};
+```
+
+<CardGroup cols={2}>
+  <Card title="navbar" icon="bars">
+    Configures the top navigation bar: site title, logo, and nav links. Items can be links, dropdowns, doc sidebar links, or version selectors.
+  </Card>
+  <Card title="footer" icon="grip-lines">
+    Configures the site footer: link columns, copyright text, and style (`dark` or `light`).
+  </Card>
+  <Card title="colorMode" icon="moon">
+    Controls light/dark mode defaults. Set `respectPrefersColorScheme: true` to follow the user's OS preference.
+  </Card>
+  <Card title="prism" icon="code">
+    Controls syntax highlighting. Add languages to `additionalLanguages` to enable highlighting beyond the defaults.
+  </Card>
+</CardGroup>
+
+## Internationalization (i18n)
+
+The `i18n` object configures locale support. When set up, `docusaurus build --locale fr` generates a translated build for the `fr` locale.
+
+```js title="docusaurus.config.js"
+export default {
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en', 'fr', 'de'],
+    localeConfigs: {
+      en: {label: 'English', direction: 'ltr'},
+      fr: {label: 'Français', direction: 'ltr'},
+    },
+  },
+};
+```
+
+## Custom fields
+
+Docusaurus validates the shape of `docusaurus.config.js` and rejects unknown top-level keys. To attach arbitrary data — for example, environment variables you want available in React components — use `customFields`:
+
+```js title="docusaurus.config.js"
+export default {
+  customFields: {
+    teamEmail: process.env.TEAM_EMAIL,
+    apiEndpoint: 'https://api.example.com',
+  },
+};
+```
+
+Access these values anywhere in your site using the `useDocusaurusContext` hook:
+
+```jsx
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+
+export default function ContactBanner() {
+  const {siteConfig: {customFields}} = useDocusaurusContext();
+  return <p>Contact us at {customFields.teamEmail}</p>;
+}
+```
+
+## Complete example
+
+The following config is a realistic starting point for a project documentation site:
+
+```js title="docusaurus.config.js"
+export default {
+  title: 'Acme Docs',
+  tagline: 'Build and ship docs in minutes.',
+  favicon: 'img/favicon.ico',
+
+  url: 'https://docs.acme.com',
+  baseUrl: '/',
+
+  organizationName: 'acme-corp',
+  projectName: 'acme-docs',
+  deploymentBranch: 'gh-pages',
+  trailingSlash: false,
+
+  onBrokenLinks: 'throw',
+  onBrokenMarkdownLinks: 'warn',
+
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en'],
+  },
+
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        docs: {
+          sidebarPath: './sidebars.js',
+          editUrl: 'https://github.com/acme-corp/acme-docs/edit/main/',
+        },
+        blog: {
+          showReadingTime: true,
+        },
+        theme: {
+          customCss: ['./src/css/custom.css'],
+        },
+      },
+    ],
+  ],
+
+  themeConfig: {
+    navbar: {
+      title: 'Acme Docs',
+      logo: {
+        alt: 'Acme Logo',
+        src: 'img/logo.svg',
+      },
+      items: [
+        {
+          type: 'docSidebar',
+          sidebarId: 'mainSidebar',
+          position: 'left',
+          label: 'Docs',
+        },
+        {to: '/blog', label: 'Blog', position: 'left'},
+        {
+          href: 'https://github.com/acme-corp/acme-docs',
+          label: 'GitHub',
+          position: 'right',
+        },
+      ],
+    },
+    footer: {
+      style: 'dark',
+      links: [
+        {
+          title: 'Documentation',
+          items: [
+            {label: 'Getting started', to: '/docs/intro'},
+            {label: 'Installation', to: '/docs/installation'},
+          ],
+        },
+        {
+          title: 'Community',
+          items: [
+            {
+              label: 'GitHub',
+              href: 'https://github.com/acme-corp/acme-docs',
+            },
+          ],
+        },
+      ],
+      copyright: `Copyright © ${new Date().getFullYear()} Acme Corp.`,
+    },
+    colorMode: {
+      defaultMode: 'light',
+      respectPrefersColorScheme: true,
+    },
+  },
+};
+```

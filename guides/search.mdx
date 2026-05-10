@@ -1,0 +1,182 @@
+---
+title: "Add Full-Text Search to Your Docusaurus Site"
+description: "Integrate Algolia DocSearch into Docusaurus, configure contextual search and AI-powered results, and explore local search alternatives for smaller documentation sites."
+---
+
+Docusaurus does not include a built-in search engine, but it integrates seamlessly with several search solutions. Algolia DocSearch is the officially supported option, while Typesense DocSearch and community local search plugins are maintained by the community.
+
+<CardGroup cols={2}>
+  <Card title="Algolia DocSearch" icon="magnifying-glass">
+    Official, free for developer docs. Hosted crawler indexes your site weekly.
+  </Card>
+  <Card title="Typesense DocSearch" icon="server">
+    Open-source alternative to Algolia. Self-host or use Typesense Cloud.
+  </Card>
+  <Card title="Local search" icon="hard-drive">
+    Index downloaded to the browser. Best for small sites or private deployments.
+  </Card>
+  <Card title="Custom SearchBar" icon="code">
+    Swizzle the `SearchBar` component to build your own search experience.
+  </Card>
+</CardGroup>
+
+## Algolia DocSearch
+
+Algolia DocSearch is **free** for any open-source or developer documentation site. Apply at `https://docsearch.algolia.com/apply/`. Algolia crawls your site once a week and aggregates all content into an Algolia index that is queried directly from your frontend.
+
+<Note>
+  The Docusaurus classic preset generates a `sitemap.xml` automatically. Algolia's crawler uses this sitemap to discover pages efficiently.
+</Note>
+
+### Configuration
+
+If you use `@docusaurus/preset-classic`, no extra installation is needed — Algolia integration is built in. Add the `algolia` key to your `themeConfig`:
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    algolia: {
+      // The application ID provided by Algolia
+      appId: 'YOUR_APP_ID',
+
+      // Public API key: safe to commit
+      apiKey: 'YOUR_SEARCH_API_KEY',
+
+      indexName: 'YOUR_INDEX_NAME',
+
+      // Filter results to the current language and version
+      contextualSearch: true,
+
+      // Optional: path for the search results page (false to disable)
+      searchPagePath: 'search',
+
+      // Optional: enable AI-powered conversational search
+      askAi: 'YOUR_ALGOLIA_ASK_AI_ASSISTANT_ID',
+    },
+  },
+};
+```
+
+<Warning>
+  Search will not work reliably until Algolia has crawled your site at least once. After any significant content change, trigger a new crawl from the Algolia dashboard.
+</Warning>
+
+### Contextual search
+
+Contextual search is enabled by default. It automatically scopes search results to the version and language the user is currently browsing:
+
+- On `/en/docs/v2/myDoc`, results include only **English v2** docs.
+- On `/fr/docs/v1/myDoc`, results include only **French v1** docs.
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    algolia: {
+      contextualSearch: true, // default
+    },
+  },
+};
+```
+
+If you need full control over facet filters, disable contextual search and define `facetFilters` manually:
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    algolia: {
+      contextualSearch: false,
+      searchParameters: {
+        facetFilters: ['language:en', ['filter1', 'filter2']],
+      },
+    },
+  },
+};
+```
+
+### Ask AI
+
+Ask AI brings conversational search to your documentation. Users can ask natural-language questions and receive context-aware answers sourced from your Algolia index:
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    algolia: {
+      askAi: {
+        assistantId: 'YOUR_ALGOLIA_ASK_AI_ASSISTANT_ID',
+        suggestedQuestions: true, // show suggested questions in the UI
+      },
+    },
+  },
+};
+```
+
+### Styling the search modal
+
+Override Algolia's CSS variables using Infima CSS variables from your `src/css/custom.css`:
+
+```css title="src/css/custom.css"
+[data-theme='light'] .DocSearch {
+  --docsearch-muted-color: var(--ifm-color-secondary-darkest);
+  --docsearch-container-background: rgba(94, 100, 112, 0.7);
+  --docsearch-modal-background: var(--ifm-color-secondary-lighter);
+  --docsearch-searchbox-background: var(--ifm-color-secondary);
+  --docsearch-searchbox-focus-background: var(--ifm-color-white);
+  --docsearch-hit-color: var(--ifm-font-color-base);
+  --docsearch-hit-active-color: var(--ifm-color-white);
+  --docsearch-hit-background: var(--ifm-color-white);
+  --docsearch-footer-background: var(--ifm-color-white);
+}
+
+[data-theme='dark'] .DocSearch {
+  --docsearch-text-color: var(--ifm-font-color-base);
+  --docsearch-muted-color: var(--ifm-color-secondary-darkest);
+  --docsearch-container-background: rgba(47, 55, 69, 0.7);
+  --docsearch-modal-background: var(--ifm-background-color);
+  --docsearch-searchbox-background: var(--ifm-background-color);
+  --docsearch-hit-color: var(--ifm-font-color-base);
+  --docsearch-hit-active-color: var(--ifm-color-white);
+  --docsearch-hit-background: var(--ifm-color-emphasis-100);
+  --docsearch-footer-background: var(--ifm-background-surface-color);
+}
+```
+
+### Troubleshooting: no search results
+
+No results typically indicates an index configuration problem. Docusaurus uses Algolia faceting for contextual search, which requires the following facet fields to be configured on your index: `docusaurus_tag`, `language`, `lang`, `version`, `type`.
+
+<Steps>
+  <Step title="Use the recommended crawler config">
+    Apply the official Docusaurus v3 crawler configuration from the Algolia documentation. Using a custom config is not supported.
+  </Step>
+  <Step title="Delete and re-create the index">
+    Delete your Algolia index through the Algolia UI, then trigger a new crawl to fully reinitialize it with the correct faceting settings.
+  </Step>
+  <Step title="Verify faceting fields">
+    After the crawl completes, check that `docusaurus_tag`, `language`, `lang`, `version`, and `type` appear as facet fields in your Algolia index dashboard.
+  </Step>
+</Steps>
+
+## Typesense DocSearch
+
+Typesense is an open-source instant-search engine you can self-host or run on Typesense Cloud. The integration uses two components:
+
+- `typesense-docsearch-scraper` — crawls your site and indexes into Typesense.
+- `docusaurus-theme-search-typesense` — the search bar UI component.
+
+Follow the Typesense guide to set up the scraper and install the theme plugin in your Docusaurus site.
+
+## Local search
+
+Local search downloads the entire search index to the user's browser. It works well for smaller sites or documentation that is behind a firewall and cannot be crawled by Algolia.
+
+Community-supported local search plugins are listed at `https://docusaurus.io/community/resources#search`. Install and configure the plugin of your choice following its documentation.
+
+## Custom search component
+
+If none of the existing solutions fit your needs, swizzle the `SearchBar` component from the classic theme and implement your own:
+
+```bash
+npm run swizzle @docusaurus/theme-classic SearchBar
+```
+
+This creates `src/theme/SearchBar/index.js` in your project. Restart the dev server and edit the component — Docusaurus will use your version instead of the default.

@@ -1,0 +1,259 @@
+---
+title: "Docusaurus CLI Command Reference"
+description: "Reference for all Docusaurus CLI commands — start, build, swizzle, deploy, serve, clear, write-translations, write-heading-ids — with every flag and its default value."
+---
+
+The Docusaurus CLI provides a set of commands to develop, build, and deploy your documentation site. After bootstrapping a project, these commands are available through your package manager via the scripts defined in `package.json`.
+
+```json title="package.json"
+{
+  "scripts": {
+    "docusaurus": "docusaurus",
+    "start": "docusaurus start",
+    "build": "docusaurus build",
+    "swizzle": "docusaurus swizzle",
+    "deploy": "docusaurus deploy",
+    "clear": "docusaurus clear",
+    "serve": "docusaurus serve",
+    "write-translations": "docusaurus write-translations",
+    "write-heading-ids": "docusaurus write-heading-ids"
+  }
+}
+```
+
+## docusaurus start
+
+Builds and serves a preview of your site locally using the Webpack Dev Server. Changes to your source files are reflected immediately through Hot Module Replacement.
+
+```bash
+docusaurus start [siteDir]
+```
+
+<Note>
+Some features such as anchor links behave differently in development. Use `docusaurus build` and `docusaurus serve` to preview production behavior exactly.
+</Note>
+
+### Options
+
+| Name | Default | Description |
+| --- | --- | --- |
+| `-p, --port <port>` | `3000` | Port for the dev server. |
+| `-h, --host <host>` | `localhost` | Hostname to bind. Use `0.0.0.0` to expose the server on all network interfaces. |
+| `-l, --locale <locale>` | — | Start the dev server for a specific site locale only. |
+| `--hot-only` | `false` | Disable the full page refresh fallback when Hot Module Replacement fails. |
+| `--no-open` | `false` | Prevent the browser from opening automatically on startup. |
+| `--config <config>` | `[siteDir]/docusaurus.config.js` | Path to a custom Docusaurus config file. |
+| `--poll [interval]` | `false` | Use file polling instead of filesystem watching for live reload. Accepts an optional interval in milliseconds. |
+| `--no-minify` | `false` | Skip JS/CSS bundle minification during the dev build. |
+
+### Enabling HTTPS locally
+
+<Steps>
+  <Step title="Generate a local certificate">
+    ```bash
+    mkcert localhost
+    ```
+    This creates `localhost.pem` and `localhost-key.pem` in the current directory.
+  </Step>
+  <Step title="Install the certificate in your trust store">
+    ```bash
+    mkcert -install
+    ```
+    Restart your browser after this step.
+  </Step>
+  <Step title="Start the dev server with HTTPS">
+    ```bash
+    HTTPS=true SSL_CRT_FILE=localhost.pem SSL_KEY_FILE=localhost-key.pem yarn start
+    ```
+  </Step>
+  <Step title="Open the site">
+    Navigate to `https://localhost:3000/`.
+  </Step>
+</Steps>
+
+### Exposing the server over a network
+
+When working inside a remote environment such as GitHub Codespaces, run the dev server on `0.0.0.0` to make it reachable from the forwarded port:
+
+```bash
+npm run start -- --host 0.0.0.0
+```
+
+---
+
+## docusaurus build
+
+Compiles your site for production. Outputs static HTML, JS, and CSS to the `build/` directory by default.
+
+```bash
+docusaurus build [siteDir]
+```
+
+### Options
+
+| Name | Default | Description |
+| --- | --- | --- |
+| `--dev` | — | Build in dev mode, enabling full React error messages. |
+| `--bundle-analyzer` | `false` | Open the webpack bundle analyzer to inspect output file sizes. |
+| `--out-dir <dir>` | `build` | Output directory path, relative to the current workspace. |
+| `--config <config>` | `[siteDir]/docusaurus.config.js` | Path to a custom Docusaurus config file. |
+| `-l, --locale <locale...>` | all locales | Build only the specified locale(s). Pass the flag multiple times for multiple locales. |
+| `--no-minify` | `false` | Skip JS/CSS bundle minification. |
+
+<Tip>
+CSS minification uses the advanced `cssnano` preset plus several PostCSS plugins by default. If you encounter broken styles after a build, set `USE_SIMPLE_CSS_MINIFIER=true` to fall back to the default cssnano preset. You can also skip HTML minification with `SKIP_HTML_MINIFICATION=true`.
+</Tip>
+
+---
+
+## docusaurus swizzle
+
+Copies a theme component into your `src/` directory so you can customize it. The interactive CLI guides you through selecting a theme, a component, and an action.
+
+```bash
+docusaurus swizzle [themeName] [componentName] [siteDir]
+```
+
+**Example — eject the Footer component:**
+
+```bash
+npm run swizzle @docusaurus/theme-classic Footer -- --eject
+```
+
+### Options
+
+| Name | Description |
+| --- | --- |
+| `themeName` | Name of the theme package to swizzle from (e.g., `@docusaurus/theme-classic`). |
+| `componentName` | Name of the component to swizzle (e.g., `Footer`). |
+| `-w, --wrap` | Create a wrapper around the original component, rendering additional content before or after it. |
+| `-e, --eject` | Eject the full source of the component, allowing complete replacement. |
+| `-l, --list` | List all swizzleable components without prompting. |
+| `-t, --typescript` | Copy the TypeScript variant of the component when available. |
+| `-j, --javascript` | Copy the JavaScript variant of the component when available. |
+| `--danger` | Allow swizzling of components marked as unsafe. |
+| `--config <config>` | Path to a custom Docusaurus config file. |
+
+<Warning>
+Components marked as unsafe have a higher risk of breaking changes across Docusaurus versions due to internal refactoring. Use `--danger` with caution and test after each upgrade.
+</Warning>
+
+<AccordionGroup>
+  <Accordion title="Wrap vs. eject — which should I use?">
+    **Wrap** is safer. It keeps the original component intact and lets you render extra UI around it. Your wrapper re-uses the upstream component, so it is less likely to break on upgrades.
+
+    **Eject** gives you full control but means you own the entire component source. You will need to manually reconcile changes when upgrading Docusaurus.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## docusaurus deploy
+
+Builds the site and deploys it to GitHub Pages. Reads `organizationName`, `projectName`, and optionally `deploymentBranch` from `docusaurus.config.js`.
+
+```bash
+docusaurus deploy [siteDir]
+```
+
+### Options
+
+| Name | Default | Description |
+| --- | --- | --- |
+| `-l, --locale <locale>` | all locales | Deploy only the specified locale(s). |
+| `--out-dir <dir>` | `build` | Output directory, relative to the current workspace. |
+| `--skip-build` | `false` | Deploy without rebuilding. Useful when using a custom build script. |
+| `--target-dir <dir>` | `.` | Target subdirectory inside the deployment branch. |
+| `--config <config>` | `[siteDir]/docusaurus.config.js` | Path to a custom Docusaurus config file. |
+
+<Info>
+The deploy command uses SSH or HTTPS based on the `USE_SSH` environment variable. Set `USE_SSH=true` to deploy over SSH.
+</Info>
+
+---
+
+## docusaurus serve
+
+Serves the pre-built static site locally. Run `docusaurus build` first, or pass `--build` to build before serving.
+
+```bash
+docusaurus serve [siteDir]
+```
+
+### Options
+
+| Name | Default | Description |
+| --- | --- | --- |
+| `-p, --port <port>` | `3000` | Port to serve on. |
+| `-h, --host <host>` | `localhost` | Hostname to bind. |
+| `--dir <dir>` | `build` | Directory containing the built site, relative to the current workspace. |
+| `--build` | `false` | Build the site before serving. |
+| `--no-open` | `false` locally, `true` in CI | Prevent opening a browser window automatically. |
+| `--config <config>` | `[siteDir]/docusaurus.config.js` | Path to a custom Docusaurus config file. |
+
+---
+
+## docusaurus clear
+
+Removes all generated build artifacts, caches, and temporary files from the `.docusaurus/` and `build/` directories.
+
+```bash
+docusaurus clear [siteDir]
+```
+
+<Tip>
+Run `docusaurus clear` before reporting a bug, after upgrading Docusaurus, or whenever you experience unexpected build behavior. This command takes no additional flags.
+</Tip>
+
+---
+
+## docusaurus write-translations
+
+Extracts all translatable strings from your site source code and writes JSON translation files to `website/i18n/<defaultLocale>/` by default.
+
+```bash
+docusaurus write-translations [siteDir]
+```
+
+### Options
+
+| Name | Default | Description |
+| --- | --- | --- |
+| `-l, --locale <locale>` | `<defaultLocale>` | Target locale folder to write translation files into. |
+| `--override` | `false` | Overwrite existing translation messages. Commit or back up existing translations first. |
+| `--config <config>` | `[siteDir]/docusaurus.config.js` | Path to a custom Docusaurus config file. |
+| `--messagePrefix <prefix>` | `""` | Prefix added to every new translation message to make untranslated strings visually distinct in the UI. |
+
+---
+
+## docusaurus write-heading-ids
+
+Adds explicit heading IDs to your Markdown files. Explicit IDs let you control anchor links and prevent them from changing when you rename headings.
+
+```bash
+docusaurus write-heading-ids [siteDir] [files...]
+```
+
+### Options
+
+| Name | Default | Description |
+| --- | --- | --- |
+| `files` | All MD files used by plugins | Specific files to process. Glob patterns are supported. |
+| `--syntax <syntax>` | `classic` | ID syntax to use: `classic` (`{#id}`) or `mdx-comment` (`{/* #id */}`). |
+| `--migrate` | `false` | Convert existing heading IDs to the target `--syntax` if they currently use a different format. |
+| `--overwrite` | `false` | Regenerate existing heading IDs from the heading text, replacing whatever is there. |
+| `--maintain-case` | `false` | Preserve the original casing of heading text in the generated ID. By default all IDs are lowercased. |
+
+<CodeGroup>
+
+```bash classic syntax
+docusaurus write-heading-ids docs/ --syntax classic
+# Produces: ## My Heading {#my-heading}
+```
+
+```bash mdx-comment syntax
+docusaurus write-heading-ids docs/ --syntax mdx-comment
+# Produces: ## My Heading {/* #my-heading */}
+```
+
+</CodeGroup>

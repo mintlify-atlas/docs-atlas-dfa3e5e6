@@ -1,0 +1,251 @@
+---
+title: "@docusaurus/theme-search-algolia: Search Integration Guide"
+description: "Configure Algolia DocSearch in Docusaurus — credentials, themeConfig.algolia options, contextual search, UI customization, and indexing troubleshooting."
+---
+
+`@docusaurus/theme-search-algolia` integrates [Algolia DocSearch](https://docsearch.algolia.com/) into your Docusaurus site. Once installed and configured, it replaces the empty `SearchBar` slot in the navbar with a fully functional search modal, and adds a dedicated search results page at `/search` with [OpenSearch](https://developer.mozilla.org/en-US/docs/Web/OpenSearch) support. The theme is included automatically when you use `@docusaurus/preset-classic`, so most users only need to supply their Algolia credentials.
+
+## Installation
+
+<Note>
+  If you are using `@docusaurus/preset-classic`, `theme-search-algolia` is already installed. Skip to [Configuration](#configuration).
+</Note>
+
+```bash
+npm install --save @docusaurus/theme-search-algolia
+```
+
+Then register it as a theme in your config:
+
+```js title="docusaurus.config.js"
+export default {
+  themes: ['@docusaurus/theme-search-algolia'],
+};
+```
+
+## Getting Algolia DocSearch credentials
+
+Algolia DocSearch offers a free hosted crawling service for open-source documentation sites. To get credentials:
+
+<Steps>
+  <Step title="Apply to DocSearch">
+    Submit your site at [docsearch.algolia.com/apply](https://docsearch.algolia.com/apply). The Algolia team reviews applications and provisions a free crawler for qualifying open-source sites.
+  </Step>
+  <Step title="Accept the invitation">
+    Once approved, you receive an email invitation to the Algolia application. Accept it to gain access to the Algolia dashboard.
+  </Step>
+  <Step title="Retrieve your credentials">
+    In the Algolia dashboard, navigate to your application. You need three values:
+    - **Application ID** (`appId`)
+    - **Search-only API key** (`apiKey`) — this is a public key, safe to commit
+    - **Index name** (`indexName`)
+  </Step>
+  <Step title="Add credentials to docusaurus.config.js">
+    Place all three values in `themeConfig.algolia`. See the [Configuration](#configuration) section below.
+  </Step>
+</Steps>
+
+<Warning>
+  Use the **search-only** API key, not the Admin API key. The search key is intentionally public and safe to include in your frontend config. The Admin key must never be exposed in client-side code.
+</Warning>
+
+If your project does not qualify for the free hosted plan, you can [run your own DocSearch crawler](https://docsearch.algolia.com/docs/legacy/run-your-own/) or use Algolia's standard paid plans.
+
+## Configuration
+
+All Algolia options are set inside `themeConfig.algolia` in `docusaurus.config.js`.
+
+### Required fields
+
+| Option | Type | Description |
+|---|---|---|
+| `appId` | `string` | Your Algolia Application ID. |
+| `apiKey` | `string` | Your public search-only API key. |
+| `indexName` | `string` | The Algolia index to query. |
+
+### Optional fields
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `contextualSearch` | `boolean` | `true` | When `true`, filters search results to match the current docs version and locale automatically, using Algolia facet filters. Strongly recommended for versioned or i18n sites. |
+| `searchParameters` | `object` | `{}` | Additional parameters passed directly to the Algolia search API (e.g., `facetFilters`, `hitsPerPage`). See the [Algolia Search API docs](https://www.algolia.com/doc/api-reference/search-api-parameters/) for available options. |
+| `searchPagePath` | `string \| false` | `'search'` | The path for the dedicated search results page. Set to `false` to disable the search page entirely. |
+| `externalUrlRegex` | `string` | `undefined` | A regex string. Matching search result URLs are opened in a new browser tab instead of the current one. Useful for multi-site Algolia indexes. |
+| `replaceSearchResultPathname` | `object` | `undefined` | Replaces a portion of the URL in search results. Useful when the indexed URL differs from the served URL (e.g., different base paths). |
+| `insights` | `boolean` | `false` | Enables the Algolia Insights plugin to track search analytics events. |
+
+### Complete example
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    algolia: {
+      // Required
+      appId: 'YOUR_APP_ID',
+      apiKey: 'YOUR_SEARCH_ONLY_API_KEY',
+      indexName: 'YOUR_INDEX_NAME',
+
+      // Recommended for versioned or i18n sites
+      contextualSearch: true,
+
+      // Search results page path
+      searchPagePath: 'search',
+
+      // Optional: extra Algolia search parameters
+      searchParameters: {
+        facetFilters: ['language:en'],
+      },
+
+      // Optional: open external results in a new tab
+      externalUrlRegex: 'external\\.io|domain\\.com',
+
+      // Optional: Algolia Insights
+      insights: false,
+    },
+  },
+};
+```
+
+## Contextual search
+
+Contextual search is the most important option for sites with multiple documentation versions or multiple locales. When enabled, the search widget automatically injects facet filters that restrict results to the **current version** and **current locale** — so a user browsing the `v2` docs won't see results from `v3` or from a different language.
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    algolia: {
+      appId: 'YOUR_APP_ID',
+      apiKey: 'YOUR_SEARCH_ONLY_API_KEY',
+      indexName: 'YOUR_INDEX_NAME',
+      contextualSearch: true,
+    },
+  },
+};
+```
+
+<Tip>
+  For contextual search to work correctly, your Algolia index must include `docusaurus_tag`, `version`, and `language` attributes as facets. The default DocSearch crawler configuration does this automatically.
+</Tip>
+
+## Customizing the search UI
+
+### Custom search page path
+
+By default, the full search results page is available at `/search`. Change the path or disable it entirely:
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    algolia: {
+      // ...credentials...
+      searchPagePath: 'find',   // Available at /find
+      // searchPagePath: false, // Disable the search page
+    },
+  },
+};
+```
+
+### Custom search bar position
+
+By default, the search bar appears at the far right of the navbar. You can reposition it using the `search` navbar item type:
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    navbar: {
+      items: [
+        {to: '/docs', label: 'Docs', position: 'left'},
+        {type: 'search', position: 'left'}, // Move search to left side
+      ],
+    },
+    algolia: {
+      appId: 'YOUR_APP_ID',
+      apiKey: 'YOUR_SEARCH_ONLY_API_KEY',
+      indexName: 'YOUR_INDEX_NAME',
+    },
+  },
+};
+```
+
+### Swizzling search components
+
+You can customize the search UI by swizzling the components provided by this theme:
+
+```bash
+# Wrap or eject the search bar component
+npx docusaurus swizzle @docusaurus/theme-search-algolia SearchBar
+
+# Wrap or eject the full search results page
+npx docusaurus swizzle @docusaurus/theme-search-algolia SearchPage
+```
+
+### CSS customization
+
+The search bar and modal use CSS custom properties that you can override in your `custom.css`:
+
+```css title="src/css/custom.css"
+:root {
+  /* DocSearch button in navbar */
+  --docsearch-primary-color: var(--ifm-color-primary);
+  --docsearch-searchbox-background: var(--ifm-background-color);
+
+  /* DocSearch modal */
+  --docsearch-modal-background: var(--ifm-background-color);
+  --docsearch-hit-color: var(--ifm-font-color-base);
+  --docsearch-footer-background: var(--ifm-background-color);
+}
+
+[data-theme='dark'] {
+  --docsearch-text-color: var(--ifm-font-color-base);
+  --docsearch-modal-background: var(--ifm-background-surface-color);
+  --docsearch-searchbox-focus-background: var(--ifm-color-black);
+  --docsearch-hit-background: var(--ifm-color-emphasis-100);
+  --docsearch-footer-background: var(--ifm-background-surface-color);
+}
+```
+
+## Troubleshooting indexing
+
+<AccordionGroup>
+  <Accordion title="Search returns no results">
+    Verify that the `appId`, `apiKey`, and `indexName` in your config exactly match the values in the Algolia dashboard — they are case-sensitive. Then check whether the index contains any records by browsing to it in the Algolia dashboard under **Indices**.
+
+    If you recently deployed your site, the DocSearch crawler may not have run yet. Manually trigger a crawl in the [Algolia Crawler dashboard](https://crawler.algolia.com/).
+  </Accordion>
+
+  <Accordion title="Wrong version results appear">
+    Enable `contextualSearch: true` to filter results by version automatically. Also verify that your Algolia index includes `docusaurus_tag` as a facet attribute in the index configuration.
+  </Accordion>
+
+  <Accordion title="Results point to incorrect URLs">
+    If your site is deployed at a subpath (e.g., `/docs/`) but the index was crawled at the root, use `replaceSearchResultPathname` to rewrite the URLs:
+
+    ```js title="docusaurus.config.js"
+    export default {
+      themeConfig: {
+        algolia: {
+          // ...credentials...
+          replaceSearchResultPathname: {
+            from: '/docs/',
+            to: '/',
+          },
+        },
+      },
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="Local development shows no search results">
+    The DocSearch crawler indexes your **live, publicly accessible** site. During local development the crawler has not indexed `localhost`, so search returns no results. This is expected behavior. Deploy your site and wait for a crawl to populate the index.
+
+    Alternatively, use the Algolia [DocSearch Scraper](https://docsearch.algolia.com/docs/legacy/run-your-own/) locally to index a local build.
+  </Accordion>
+
+  <Accordion title="Search does not work with i18n">
+    Make sure `contextualSearch` is `true` and that your Algolia index includes `language` as a facet. When DocSearch crawls a multi-locale site, each page should receive the correct `language` attribute based on the URL path or locale prefix.
+  </Accordion>
+</AccordionGroup>
+
+## OpenSearch support
+
+The search page at `/search` automatically includes an [OpenSearch](https://developer.mozilla.org/en-US/docs/Web/OpenSearch) description file. This allows browsers and toolbars that support OpenSearch to offer your site as a built-in search engine. No extra configuration is required.

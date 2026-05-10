@@ -1,0 +1,182 @@
+---
+title: "Docusaurus Routing: Files, URLs, and Code Splitting"
+description: "Learn how Docusaurus maps files to URLs, generates nested routes for docs, splits bundles per route, and handles SPA navigation and static HTML output."
+---
+
+Docusaurus follows single-page application conventions for routing: each URL corresponds to exactly one React component. That component is bundled separately and only loaded when the user navigates to its route. The routing layer is powered by React Router, but Docusaurus adds a static site generation pass on top so that every route also exists as a pre-rendered HTML file on disk.
+
+## Routing in content plugins
+
+Every content plugin provides a `routeBasePath` option that controls where its routes are mounted in the URL tree. The defaults are:
+
+| Plugin | Default `routeBasePath` |
+|---|---|
+| `@docusaurus/plugin-content-docs` | `/docs` |
+| `@docusaurus/plugin-content-blog` | `/blog` |
+| `@docusaurus/plugin-content-pages` | `/` |
+
+Routes are nested under the base URL of the site. A request for `/docs/advanced/routing` first matches the `/docs` branch (registered by the docs plugin) and then resolves to the individual doc inside that branch.
+
+<Tip>
+Setting `routeBasePath: '/'` for the docs plugin enables "docs-only mode" — all docs routes lose the `/docs` prefix. Other plugins can still add their own route trees alongside it.
+</Tip>
+
+### Pages routing
+
+The pages plugin maps files directly to URLs with no extra configuration. `src/pages/index.tsx` becomes `/`; `src/pages/about.md` becomes `/about`. The component for Markdown pages is `@theme/MDXPage`; React pages are used directly as the route component.
+
+### Blog routing
+
+The blog plugin creates several route types from a single `blog/` directory:
+
+<AccordionGroup>
+  <Accordion title="Post list pages">
+    `/blog`, `/blog/page/2`, `/blog/page/3` … Paginated with `@theme/BlogListPage`. The base path is configurable via `pageBasePath`.
+  </Accordion>
+  <Accordion title="Individual post pages">
+    One route per Markdown post, e.g. `/blog/2024/05/10/my-post`. The URL is fully customisable through the `slug` front matter field. Component: `@theme/BlogPostPage`.
+  </Accordion>
+  <Accordion title="Tag pages">
+    A tags index at `/blog/tags` (`@theme/BlogTagsListPage`) and per-tag listing pages at `/blog/tags/my-tag` (`@theme/BlogTagsPostsPage`). Base path configurable via `tagsBasePath`.
+  </Accordion>
+  <Accordion title="Archive page">
+    A chronological listing of all posts at `/blog/archive`. Component: `@theme/BlogArchivePage`. Base path configurable via `archiveBasePath`.
+  </Accordion>
+</AccordionGroup>
+
+### Docs routing and nested routes
+
+The docs plugin is the only built-in plugin that creates **nested routes**. It registers a top-level version route (e.g. `/docs/`, `/docs/next/`, `/docs/2.0.0/`) rendered by `@theme/DocPage`. Individual docs are rendered inside that layout by `@theme/DocItem`. This nesting keeps the sidebar and version context alive as the user moves between docs pages without a full page reload.
+
+```
+/docs/                        ← DocPage layout (sidebar, navbar, footer)
+  ├── advanced/routing        ← DocItem (the current page's content)
+  ├── advanced/architecture   ← DocItem
+  └── intro                  ← DocItem
+```
+
+The `slug` front matter customises the final segment of a doc's URL but cannot override the version base path set by `routeBasePath`.
+
+## File paths vs. URL paths
+
+Docusaurus distinguishes between file paths (references to files on disk) and URL paths (addresses in the browser). When you write a link in Markdown, Docusaurus uses these heuristics to decide which kind it is:
+
+<Tabs>
+  <Tab title="URL paths">
+    - Starts with `http://` or `https://` — always an external URL.
+    - Has no file extension — treated as a URL path. `[page](../plugins)` on `/docs/advanced/routing` links to `/docs/plugins`. Broken-link detection runs at build time, not at author time.
+  </Tab>
+  <Tab title="File paths">
+    - Starts with `@site/` — always an asset file path.
+    - Has a `.md` or `.mdx` extension — Docusaurus resolves it to the corresponding URL and replaces the link.
+    - Has any other extension — treated as a static asset and bundled by Webpack.
+  </Tab>
+</Tabs>
+
+### Sample file-to-URL mapping
+
+```bash
+.
+├── blog/                               # routeBasePath: '/blog'
+│   ├── 2024-05-10-first-post.md        # → /blog/2024/05/10/first-post
+│   └── 2024-06-01-welcome/
+│       └── index.md                    # → /blog/2024/06/01/welcome
+├── docs/                               # routeBasePath: '/docs'
+│   ├── intro.md                        # → /docs/intro
+│   └── advanced/
+│       ├── routing.md                  # → /docs/advanced/routing
+│       └── architecture.md            # → /docs/advanced/architecture
+└── src/pages/                          # routeBasePath: '/'
+    ├── index.tsx                       # → /
+    └── about.md                        # → /about
+```
+
+## Routes become HTML files
+
+Because Docusaurus is a static site generator, every registered route is pre-rendered to an HTML file during `docusaurus build`. The URL `/docs/advanced/routing` maps to the file `build/docs/advanced/routing/index.html`. This is the file served when a user first loads the page; the browser then hydrates it into a full SPA.
+
+<Note>
+If `trailingSlash: false` is set in `docusaurus.config.js`, the output file is `routing.html` rather than `routing/index.html`. Some hosting providers treat these differently — see the [trailing slash guide](https://github.com/slorber/trailing-slash-guide) for details.
+</Note>
+
+All HTML files reference their JS assets using absolute URLs, which means `baseUrl` must be correct. If your site is deployed under `https://example.com/myproject/`, set `baseUrl: '/myproject/'` so that asset URLs resolve correctly.
+
+## Generating and accessing routes
+
+Plugins register routes using the `addRoute` action inside `contentLoaded`. All registered routes are aggregated into `.docusaurus/routes.js`, which you can inspect via the debug plugin's routes panel (available at `/__docusaurus/debug/routes` in development).
+
+```js title="my-plugin/index.js"
+async contentLoaded({content, actions}) {
+  const {addRoute, createData} = actions;
+
+  const propsPath = await createData(
+    'my-page-props.json',
+    JSON.stringify({items: content.items}),
+  );
+
+  addRoute({
+    path: '/my-page',
+    component: '@site/src/components/MyPage',
+    modules: {items: propsPath},
+    exact: true,
+  });
+},
+```
+
+## Code splitting
+
+Each route's component and its prop modules are code-split automatically. Webpack emits a separate chunk for each route so that the browser only downloads what it needs for the current page. On navigation, Docusaurus preloads the next route's chunk while the current page is still displayed, making transitions feel instant.
+
+## Accessing the current route in components
+
+On the client side, use `@docusaurus/router` (a re-export of `react-router-dom` v5) to read the current location. This API is SSR-safe, unlike `window.location`.
+
+```jsx title="src/components/CurrentPath.jsx"
+import React from 'react';
+import {useLocation} from '@docusaurus/router';
+
+export default function CurrentPath() {
+  const location = useLocation();
+  return (
+    <span>
+      Current path: <code>{location.pathname}</code>
+    </span>
+  );
+}
+```
+
+To access site-wide config (title, base URL, custom fields) alongside the route, combine `useLocation` with `useDocusaurusContext`:
+
+```jsx title="src/components/BreadcrumbBar.jsx"
+import React from 'react';
+import {useLocation} from '@docusaurus/router';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+
+export default function BreadcrumbBar() {
+  const {siteConfig} = useDocusaurusContext();
+  const {pathname} = useLocation();
+  return (
+    <nav aria-label="breadcrumb">
+      <a href={siteConfig.baseUrl}>{siteConfig.title}</a>
+      {' › '}
+      {pathname}
+    </nav>
+  );
+}
+```
+
+## Escaping SPA redirects
+
+Docusaurus is a single-page application: internal navigations use `history.push()` and never cause a full page reload. If you place an HTML file in `static/`, it is copied to the build output but is **not** part of the React Router route tree. Linking to it with a normal Markdown link causes the SPA router to intercept the click and show a 404.
+
+Use the `pathname://` protocol to opt out of SPA navigation for a specific link:
+
+```md
+[View raw HTML page](pathname:///my-static-page.html)
+```
+
+Docusaurus strips the `pathname://` prefix and emits a plain `<a href="/my-static-page.html">` that the browser follows with a full navigation.
+
+<Warning>
+The `pathname://` protocol bypasses React Router entirely. Use it only for links to files in `static/` that are not part of the Docusaurus route system.
+</Warning>

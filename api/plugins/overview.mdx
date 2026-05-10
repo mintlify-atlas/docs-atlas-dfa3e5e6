@@ -1,0 +1,156 @@
+---
+title: "Docusaurus Plugins Overview and Official Plugin List"
+description: "Learn what Docusaurus plugins are, how they differ from presets, and explore all official plugins for docs, blog, pages, sitemap, PWA, and more."
+---
+
+Docusaurus plugins are the primary extension mechanism for adding features to your site. Each plugin is a Node.js package that hooks into the Docusaurus build pipeline — loading content, generating routes, injecting scripts, and more. Presets are simply curated bundles of plugins and theme configurations published together for convenience.
+
+## Plugins vs. presets
+
+A **plugin** is a single package that implements one feature (e.g. the docs system, a sitemap, Google Analytics). A **preset** groups multiple plugins and a theme under one install so you don't have to wire them up individually.
+
+<Note>
+Most new Docusaurus projects use `@docusaurus/preset-classic`, which bundles `plugin-content-docs`, `plugin-content-blog`, `plugin-content-pages`, `plugin-sitemap`, and `theme-classic` in a single dependency.
+</Note>
+
+When you configure a preset, its plugin options are passed through a top-level key named after each plugin:
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        docs: {
+          // options for plugin-content-docs
+          routeBasePath: 'docs',
+          sidebarPath: './sidebars.js',
+        },
+        blog: {
+          // options for plugin-content-blog
+          showReadingTime: true,
+        },
+        theme: {
+          // options for theme-classic
+          customCss: './src/css/custom.css',
+        },
+      },
+    ],
+  ],
+};
+```
+
+## Installing standalone plugins
+
+If you need a plugin that is not included in your preset, install it separately and register it in `docusaurus.config.js`:
+
+```bash npm2yarn
+npm install --save @docusaurus/plugin-sitemap
+```
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: [
+    [
+      '@docusaurus/plugin-sitemap',
+      {
+        changefreq: 'weekly',
+        priority: 0.5,
+      },
+    ],
+  ],
+};
+```
+
+Plugins that require no options can be registered as a plain string:
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: ['@docusaurus/plugin-debug'],
+};
+```
+
+## Plugin execution order
+
+Multiple plugin instances run in the order they appear in the `plugins` array. Preset plugins run after standalone plugins. Theme components are merged in reverse order, so the last theme wins for any given component.
+
+<Tip>
+You can run multiple instances of the same plugin (e.g. two separate doc sets) by providing a unique `id` option to each instance.
+</Tip>
+
+## Official plugins
+
+### Content plugins
+
+These plugins load your source content from the filesystem and create pages for the theme to render.
+
+<CardGroup cols={3}>
+  <Card title="plugin-content-docs" href="/api/plugins/content-docs">
+    The docs system with versioning, sidebars, and MDX support. Included in `preset-classic`.
+  </Card>
+  <Card title="plugin-content-blog" href="/api/plugins/content-blog">
+    A full-featured blog with tags, authors, RSS/Atom feeds, and pagination. Included in `preset-classic`.
+  </Card>
+  <Card title="plugin-content-pages" href="/api/plugins/content-pages">
+    Turns React and MDX files in `src/pages/` into standalone website pages. Included in `preset-classic`.
+  </Card>
+</CardGroup>
+
+### Behavior plugins
+
+These plugins enhance your site without managing page content directly.
+
+<CardGroup cols={2}>
+  <Card title="plugin-sitemap" href="/api/plugins/sitemap">
+    Generates a `sitemap.xml` for search engine crawlers. Included in `preset-classic`.
+  </Card>
+  <Card title="plugin-pwa" href="/api/plugins/pwa">
+    Adds Progressive Web App support via Workbox — offline mode, install prompts, and service workers.
+  </Card>
+  <Card title="plugin-client-redirects">
+    Creates client-side redirects for legacy URLs, emitting redirect HTML pages at build time.
+  </Card>
+  <Card title="plugin-ideal-image">
+    Generates optimized, responsive images and adds lazy-loading via a custom React component.
+  </Card>
+  <Card title="plugin-debug">
+    Exposes a `/__docusaurus/debug` route with internal plugin data useful during development.
+  </Card>
+  <Card title="plugin-svgr">
+    Allows importing SVG files as React components using SVGR.
+  </Card>
+</CardGroup>
+
+### Analytics plugins
+
+<CardGroup cols={3}>
+  <Card title="plugin-google-gtag">
+    Integrates Google Analytics 4 (gtag.js) tracking into every page.
+  </Card>
+  <Card title="plugin-google-tag-manager">
+    Integrates Google Tag Manager for flexible, consent-aware analytics.
+  </Card>
+  <Card title="plugin-google-analytics">
+    Legacy Universal Analytics support (GA3). Prefer `plugin-google-gtag` for new projects.
+  </Card>
+</CardGroup>
+
+## `@docusaurus/preset-classic` bundle
+
+The classic preset is the recommended starting point. It installs and configures these packages together:
+
+| Package | Preset key |
+|---------|-----------|
+| `@docusaurus/plugin-content-docs` | `docs` |
+| `@docusaurus/plugin-content-blog` | `blog` |
+| `@docusaurus/plugin-content-pages` | `pages` |
+| `@docusaurus/plugin-sitemap` | `sitemap` |
+| `@docusaurus/theme-classic` | `theme` |
+
+```bash npm2yarn
+npm install --save @docusaurus/preset-classic
+```
+
+<Info>
+When using `preset-classic`, you do **not** need to install the bundled plugins separately. Configure them through the preset options object instead of the `plugins` array.
+</Info>

@@ -1,0 +1,200 @@
+---
+title: "Install Docusaurus and Scaffold Your First Site"
+description: "Complete guide to installing Docusaurus with Node.js 24.14+, scaffolding a project with create-docusaurus, and running the development and production build."
+---
+
+Docusaurus is a set of npm packages that generate a full-featured documentation website from Markdown and MDX files. This page walks you through installing the prerequisites, creating a new project with the `create-docusaurus` scaffolding tool, exploring the generated file structure, and running the site locally and in production.
+
+<Steps>
+  <Step title="Check Node.js version">
+    Docusaurus requires **Node.js 24.14 or later**. Verify your version before proceeding:
+
+    ```bash
+    node -v
+    ```
+
+    If the output is below `v24.14`, install or upgrade Node.js from [nodejs.org](https://nodejs.org/en/download/). If you manage multiple Node.js versions, [nvm](https://github.com/nvm-sh/nvm) makes switching straightforward.
+  </Step>
+
+  <Step title="Scaffold a new site">
+    Use the `create-docusaurus` CLI to generate a complete starter project. The `classic` template is recommended — it bundles the `@docusaurus/preset-classic` preset, which includes docs, a blog, custom pages, and a CSS framework with dark mode.
+
+    <CodeGroup>
+      ```bash npm
+      npx create-docusaurus@latest my-website classic
+      ```
+
+      ```bash yarn
+      yarn create docusaurus my-website classic
+      ```
+
+      ```bash pnpm
+      pnpm create docusaurus my-website classic
+      ```
+    </CodeGroup>
+
+    <Tip>
+      To use TypeScript instead of JavaScript, append the `--typescript` flag:
+
+      ```bash
+      npx create-docusaurus@latest my-website classic --typescript
+      ```
+    </Tip>
+
+    The CLI detects your package manager automatically. If it cannot determine one, it will prompt you to choose between npm, yarn, pnpm, and bun.
+  </Step>
+
+  <Step title="Explore the generated project">
+    After scaffolding, your project directory looks like this:
+
+    ```
+    my-website
+    ├── blog
+    │   ├── 2019-05-28-hola.mdx
+    │   ├── 2019-05-29-hello-world.mdx
+    │   └── 2020-05-30-welcome.mdx
+    ├── docs
+    │   ├── doc1.mdx
+    │   ├── doc2.mdx
+    │   ├── doc3.mdx
+    │   └── mdx.mdx
+    ├── src
+    │   ├── css
+    │   │   └── custom.css
+    │   └── pages
+    │       ├── styles.module.css
+    │       └── index.js
+    ├── static
+    │   └── img
+    ├── docusaurus.config.js
+    ├── package.json
+    ├── README.md
+    ├── sidebars.js
+    └── yarn.lock
+    ```
+
+    <Tabs>
+      <Tab title="docs/">
+        Contains the Markdown and MDX source files for your documentation. The sidebar order is controlled by `sidebars.js`. You can rename this directory by setting the `path` option in your docs plugin config.
+      </Tab>
+      <Tab title="blog/">
+        Contains blog post Markdown files. File names follow the `YYYY-MM-DD-slug.mdx` convention. Delete this folder if you disable the blog plugin.
+      </Tab>
+      <Tab title="src/">
+        Non-documentation source files: custom React components, global CSS (`src/css/custom.css`), and standalone pages (`src/pages/`). Any `.jsx`, `.tsx`, or `.mdx` file in `src/pages/` becomes a route on your site.
+      </Tab>
+      <Tab title="static/">
+        Files placed here are copied verbatim into the root of the `build/` output directory. Use it for favicons, robots.txt, CNAME files, and other assets that should live at the site root.
+      </Tab>
+      <Tab title="Config files">
+        | File | Purpose |
+        |---|---|
+        | `docusaurus.config.js` | Central site configuration (title, URL, plugins, theme) |
+        | `sidebars.js` | Controls the docs sidebar structure and ordering |
+        | `package.json` | npm package manifest — add any npm package here |
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Start the development server">
+    The development server watches for file changes and reloads the browser automatically.
+
+    <CodeGroup>
+      ```bash npm
+      cd my-website
+      npm run start
+      ```
+
+      ```bash yarn
+      cd my-website
+      yarn start
+      ```
+
+      ```bash pnpm
+      cd my-website
+      pnpm run start
+      ```
+    </CodeGroup>
+
+    The site opens at [http://localhost:3000](http://localhost:3000) by default. Edit any file in `docs/`, `blog/`, or `src/` and the browser will reflect the change instantly.
+  </Step>
+
+  <Step title="Build for production">
+    When you are ready to publish, generate the optimized static output:
+
+    <CodeGroup>
+      ```bash npm
+      npm run build
+      ```
+
+      ```bash yarn
+      yarn build
+      ```
+
+      ```bash pnpm
+      pnpm run build
+      ```
+    </CodeGroup>
+
+    The compiled site is written to the `build/` directory. You can preview it locally before deploying:
+
+    <CodeGroup>
+      ```bash npm
+      npm run serve
+      ```
+
+      ```bash yarn
+      yarn serve
+      ```
+
+      ```bash pnpm
+      pnpm run serve
+      ```
+    </CodeGroup>
+
+    <Note>
+      `npm run serve` starts a local HTTP server against the `build/` directory and is the most accurate way to test the production output before pushing to a host.
+    </Note>
+  </Step>
+</Steps>
+
+## Monorepo setup
+
+If Docusaurus is part of a larger monorepo alongside the packages it documents, scaffold the site into a subdirectory:
+
+```
+my-monorepo
+├── package-a        # Your main project source
+│   └── package.json
+├── website          # Docusaurus root
+│   ├── docs/
+│   ├── src/
+│   └── package.json
+└── package.json     # Shared monorepo dependencies
+```
+
+Run `npx create-docusaurus@latest` from the monorepo root and specify `website` as the site name. On hosting platforms like Netlify or Vercel, set the **base directory** to `./website` so the platform resolves the correct root for builds.
+
+## Updating Docusaurus
+
+To upgrade, update the version of every `@docusaurus/`-namespaced package in your `package.json` to the same target version, then reinstall:
+
+<CodeGroup>
+  ```bash npm
+  npm install
+  ```
+
+  ```bash yarn
+  yarn add @docusaurus/core @docusaurus/preset-classic
+  ```
+
+  ```bash pnpm
+  pnpm install
+  ```
+</CodeGroup>
+
+Confirm the upgrade succeeded:
+
+```bash
+npx docusaurus --version
+```

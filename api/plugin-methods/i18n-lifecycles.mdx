@@ -1,0 +1,729 @@
+---
+title: "i18n Lifecycle Methods for Docusaurus Plugins"
+description: "Reference for Docusaurus plugin i18n lifecycle methods: getTranslationFiles, translateContent, translateThemeConfig, and getDefaultCodeTranslationMessages."
+---
+
+Docusaurus has a built-in internationalization (i18n) pipeline that lets plugins and themes participate in the translation workflow. When you run `docusaurus write-translations`, Docusaurus calls each plugin's `getTranslationFiles` method to discover what strings need translating and writes them as JSON files under the site's `i18n/` directory. On the next build, those files are read back and passed to `translateContent` and `translateThemeConfig` so each plugin can apply the localized strings to the data it loaded.
+
+## Plugin context for i18n
+
+The `LoadContext` object passed to every plugin constructor includes an `i18n` field that exposes the current locale and all locale configuration:
+
+```typescript
+type I18n = {
+  defaultLocale: string;
+  locales: [string, ...string[]];
+  currentLocale: string;
+  path: string;
+  localeConfigs: {
+    [locale: string]: {
+      label: string;
+      htmlLang: string;
+      direction: 'ltr' | 'rtl';
+      calendar: string;
+      path: string;
+      translate: boolean;
+      url: string;
+      baseUrl: string;
+    };
+  };
+};
+```
+
+Use `context.i18n.currentLocale` inside `loadContent` to load locale-specific data files or to adjust API queries.
+
+## Translation file format
+
+All translation files use the Chrome i18n JSON format, where each key maps to an object with a `message` and an optional `description`:
+
+```typescript
+type TranslationFileContent = {
+  [msgId: string]: {
+    message: string;
+    description?: string;
+  };
+};
+
+type TranslationFile = {
+  /**
+   * Path relative to i18n/<locale>/<pluginName>/<pluginId>.
+   * Do not include the .json extension.
+   */
+  path: string;
+  content: TranslationFileContent;
+};
+```
+
+Files are written to and read from `i18n/<locale>/<pluginName>/` (where `pluginName` is the value of your plugin's `name` field).
+
+---
+
+## i18n-aware plugin skeleton
+
+A plugin that participates in i18n implements up to four methods in addition to its normal lifecycle hooks. Here is the overall shape before diving into each method:
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import type {LoadContext, Plugin} from '@docusaurus/types';
+
+interface MyContent {
+  title: string;
+  description: string;
+  items: Array<{id: string; label: string}>;
+}
+
+export default function myPlugin(context: LoadContext): Plugin<MyContent> {
+  return {
+    name: 'my-plugin',
+
+    // 1. Load raw (untranslated) content
+    async loadContent(): Promise<MyContent> { /* ... */ },
+
+    // 2. Declare which strings need translating
+    async getTranslationFiles({content}) { /* ... */ },
+
+    // 3. Apply translated strings to content before contentLoaded
+    translateContent({content, translationFiles}) { /* ... */ },
+
+    // 4. Apply translated strings to themeConfig
+    translateThemeConfig({themeConfig, translationFiles}) { /* ... */ },
+
+    // 5. Use translated content to register routes
+    async contentLoaded({content, actions}) { /* ... */ },
+
+    // Optional: supply default translations for <Translate> API usage
+    async getDefaultCodeTranslationMessages() { /* ... */ },
+  };
+}
+```
+
+```javascript my-plugin/src/index.js
+export default function myPlugin(context) {
+  return {
+    name: 'my-plugin',
+
+    async loadContent() { /* ... */ },
+    async getTranslationFiles({content}) { /* ... */ },
+    translateContent({content, translationFiles}) { /* ... */ },
+    translateThemeConfig({themeConfig, translationFiles}) { /* ... */ },
+    async contentLoaded({content, actions}) { /* ... */ },
+    async getDefaultCodeTranslationMessages() { /* ... */ },
+  };
+}
+```
+
+</CodeGroup>
+
+<Note>
+`translateContent` is called before `contentLoaded`. This means the `content` your `contentLoaded` implementation receives has already been translated for the current locale.
+</Note>
+
+---
+
+## `getTranslationFiles({content})`
+
+Declares all translation files the plugin wants to manage. Docusaurus calls this method during `docusaurus write-translations` to collect translatable strings and write them to disk, and again at build time to load the locale-specific versions.
+
+```typescript
+getTranslationFiles?: (args: {
+  content: Content;
+}) => Promise<TranslationFile[]> | TranslationFile[];
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `content` | `Content` | The value returned by `loadContent()`. Available so you can include dynamic strings (e.g. document titles) alongside static ones. |
+
+**Return value:** An array of `TranslationFile` objects. Each object's `path` is relative to `i18n/<locale>/<pluginName>/` and must not include the `.json` extension.
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import type {LoadContext, Plugin, TranslationFile} from '@docusaurus/types';
+
+interface MyContent {
+  title: string;
+  items: Array<{id: string; label: string}>;
+}
+
+export default function myPlugin(context: LoadContext): Plugin<MyContent> {
+  return {
+    name: 'my-plugin',
+
+    async loadContent(): Promise<MyContent> {
+      return {
+        title: 'My Plugin Title',
+        items: [
+          {id: 'first', label: 'First item'},
+          {id: 'second', label: 'Second item'},
+        ],
+      };
+    },
+
+    async getTranslationFiles({content}): Promise<TranslationFile[]> {
+      return [
+        {
+          // Written to: i18n/<locale>/my-plugin/labels.json
+          path: 'labels',
+          content: {
+            pluginTitle: {
+              message: content.title,
+              description: 'The main title displayed by my-plugin',
+            },
+            // Include dynamic strings derived from content
+            ...Object.fromEntries(
+              content.items.map((item) => [
+                `item_${item.id}`,
+                {
+                  message: item.label,
+                  description: `Label for item with id "${item.id}"`,
+                },
+              ]),
+            ),
+          },
+        },
+      ];
+    },
+  };
+}
+```
+
+```javascript my-plugin/src/index.js
+export default function myPlugin(context) {
+  return {
+    name: 'my-plugin',
+
+    async loadContent() {
+      return {
+        title: 'My Plugin Title',
+        items: [
+          {id: 'first', label: 'First item'},
+          {id: 'second', label: 'Second item'},
+        ],
+      };
+    },
+
+    async getTranslationFiles({content}) {
+      return [
+        {
+          path: 'labels',
+          content: {
+            pluginTitle: {
+              message: content.title,
+              description: 'The main title displayed by my-plugin',
+            },
+            ...Object.fromEntries(
+              content.items.map((item) => [
+                `item_${item.id}`,
+                {
+                  message: item.label,
+                  description: `Label for item with id "${item.id}"`,
+                },
+              ]),
+            ),
+          },
+        },
+      ];
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+After running `docusaurus write-translations --locale fr`, Docusaurus writes a file like:
+
+```json i18n/fr/my-plugin/labels.json
+{
+  "pluginTitle": {
+    "message": "My Plugin Title",
+    "description": "The main title displayed by my-plugin"
+  },
+  "item_first": {
+    "message": "First item",
+    "description": "Label for item with id \"first\""
+  },
+  "item_second": {
+    "message": "Second item",
+    "description": "Label for item with id \"second\""
+  }
+}
+```
+
+A translator then updates the `message` values. On the next build for the `fr` locale, those translated messages are passed into `translateContent`.
+
+---
+
+## `translateContent({content, translationFiles})`
+
+Applies localized strings from the translation files to the plugin's loaded content. The return value replaces `content` before it is passed to `contentLoaded`.
+
+```typescript
+translateContent?: (args: {
+  content: Content;
+  translationFiles: TranslationFile[];
+}) => Content;
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `content` | `Content` | The raw content returned by `loadContent()`. |
+| `translationFiles` | `TranslationFile[]` | The locale-specific translation files loaded from disk. |
+
+**Return value:** A new `Content` object with translated strings substituted in.
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import type {LoadContext, Plugin, TranslationFile} from '@docusaurus/types';
+
+interface MyContent {
+  title: string;
+  items: Array<{id: string; label: string}>;
+}
+
+export default function myPlugin(context: LoadContext): Plugin<MyContent> {
+  return {
+    name: 'my-plugin',
+
+    translateContent({content, translationFiles}): MyContent {
+      const labelsFile = translationFiles.find((f) => f.path === 'labels');
+      if (!labelsFile) return content;
+
+      return {
+        title: labelsFile.content.pluginTitle?.message ?? content.title,
+        items: content.items.map((item) => ({
+          ...item,
+          label:
+            labelsFile.content[`item_${item.id}`]?.message ?? item.label,
+        })),
+      };
+    },
+  };
+}
+```
+
+```javascript my-plugin/src/index.js
+export default function myPlugin(context) {
+  return {
+    name: 'my-plugin',
+
+    translateContent({content, translationFiles}) {
+      const labelsFile = translationFiles.find((f) => f.path === 'labels');
+      if (!labelsFile) return content;
+
+      return {
+        title: labelsFile.content.pluginTitle?.message ?? content.title,
+        items: content.items.map((item) => ({
+          ...item,
+          label: labelsFile.content[`item_${item.id}`]?.message ?? item.label,
+        })),
+      };
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+<Warning>
+Always fall back to the original string when a translation is missing. Not every locale will have every string translated, and missing keys should not cause build failures.
+</Warning>
+
+---
+
+## `translateThemeConfig({themeConfig, translationFiles})`
+
+Applies localized strings from the translation files to the site's `themeConfig`. Returns a new `themeConfig` with translated values. Use this when your plugin or theme adds labels to `themeConfig` that users might want to translate (for example, navbar item titles or footer link text).
+
+```typescript
+translateThemeConfig?: (args: {
+  themeConfig: ThemeConfig;
+  translationFiles: TranslationFile[];
+}) => ThemeConfig;
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `themeConfig` | `ThemeConfig` | The current site theme configuration. |
+| `translationFiles` | `TranslationFile[]` | The locale-specific translation files for this plugin. |
+
+**Return value:** A new `themeConfig` object. Only modify keys your plugin owns; spread the original object to leave other keys untouched.
+
+<CodeGroup>
+
+```typescript my-theme/src/index.ts
+import type {LoadContext, Plugin, TranslationFile} from '@docusaurus/types';
+
+interface MyThemeConfigSection {
+  navbar: {title: string};
+}
+
+export default function myTheme(context: LoadContext): Plugin {
+  return {
+    name: 'my-theme',
+
+    async getTranslationFiles() {
+      return [
+        {
+          path: 'theme-labels',
+          content: {
+            navbarTitle: {
+              message: 'My Site',
+              description: 'The site title shown in the navbar',
+            },
+          },
+        },
+      ];
+    },
+
+    translateThemeConfig({themeConfig, translationFiles}) {
+      const themeLabels = translationFiles.find(
+        (f) => f.path === 'theme-labels',
+      );
+      if (!themeLabels) return themeConfig;
+
+      const mySection = (themeConfig as unknown as MyThemeConfigSection);
+      return {
+        ...themeConfig,
+        navbar: {
+          ...mySection.navbar,
+          title:
+            themeLabels.content.navbarTitle?.message ??
+            mySection.navbar.title,
+        },
+      } as typeof themeConfig;
+    },
+  };
+}
+```
+
+```javascript my-theme/src/index.js
+export default function myTheme(context) {
+  return {
+    name: 'my-theme',
+
+    async getTranslationFiles() {
+      return [
+        {
+          path: 'theme-labels',
+          content: {
+            navbarTitle: {
+              message: 'My Site',
+              description: 'The site title shown in the navbar',
+            },
+          },
+        },
+      ];
+    },
+
+    translateThemeConfig({themeConfig, translationFiles}) {
+      const themeLabels = translationFiles.find(
+        (f) => f.path === 'theme-labels',
+      );
+      if (!themeLabels) return themeConfig;
+
+      return {
+        ...themeConfig,
+        navbar: {
+          ...themeConfig.navbar,
+          title: themeLabels.content.navbarTitle?.message ?? themeConfig.navbar.title,
+        },
+      };
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+---
+
+## `getDefaultCodeTranslationMessages()`
+
+Themes that use the `<Translate>` JSX component or `translate()` utility from `@docusaurus/Translate` can provide default translation messages. These are used when no locale-specific translation file exists for the current locale and serve as the fallback for the default locale.
+
+```typescript
+getDefaultCodeTranslationMessages?: () =>
+  | Promise<{[id: string]: string}>
+  | {[id: string]: string};
+```
+
+**Return value:** A plain object mapping translation IDs to translated strings (without descriptions). The messages should be in the current locale (`context.i18n.currentLocale`).
+
+<CodeGroup>
+
+```typescript my-theme/src/index.ts
+import type {LoadContext, Plugin} from '@docusaurus/types';
+import {readFile} from 'fs/promises';
+import path from 'path';
+
+export default function myTheme(context: LoadContext): Plugin {
+  return {
+    name: 'my-theme',
+
+    async getDefaultCodeTranslationMessages(): Promise<{
+      [id: string]: string;
+    }> {
+      const translationsDir = path.join(__dirname, '../translations');
+      const locale = context.i18n.currentLocale;
+      const filePath = path.join(translationsDir, `${locale}.json`);
+      try {
+        const content = await readFile(filePath, 'utf8');
+        return JSON.parse(content);
+      } catch {
+        // Fall back to empty if the locale file doesn't exist
+        return {};
+      }
+    },
+  };
+}
+```
+
+```javascript my-theme/src/index.js
+import {readFile} from 'fs/promises';
+import path from 'path';
+import {fileURLToPath} from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default function myTheme(context) {
+  return {
+    name: 'my-theme',
+
+    async getDefaultCodeTranslationMessages() {
+      const translationsDir = path.join(__dirname, '../translations');
+      const locale = context.i18n.currentLocale;
+      const filePath = path.join(translationsDir, `${locale}.json`);
+      try {
+        const content = await readFile(filePath, 'utf8');
+        return JSON.parse(content);
+      } catch {
+        return {};
+      }
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+A translation file loaded by `getDefaultCodeTranslationMessages` looks like this — no `description` field, just ID-to-message pairs:
+
+```json translations/fr.json
+{
+  "theme.common.editThisPage": "Modifier cette page",
+  "theme.common.lastUpdatedOn": "Dernière mise à jour le {lastUpdatedAt}",
+  "theme.navbar.mobileSidebarSecondaryMenu.backButtonLabel": "← Retour au menu principal"
+}
+```
+
+<Note>
+`getDefaultCodeTranslationMessages` is typically only needed by themes, not content plugins. Content plugins should use `getTranslationFiles` + `translateContent` instead.
+</Note>
+
+---
+
+## Complete i18n-aware plugin example
+
+The following example demonstrates all four i18n lifecycle methods working together for a plugin that loads a catalog of items with translatable labels.
+
+<CodeGroup>
+
+```typescript my-catalog-plugin/src/index.ts
+import path from 'path';
+import {readFile} from 'fs/promises';
+import type {
+  LoadContext,
+  Plugin,
+  TranslationFile,
+} from '@docusaurus/types';
+
+interface CatalogItem {
+  id: string;
+  title: string;
+  summary: string;
+}
+
+interface CatalogContent {
+  sectionTitle: string;
+  items: CatalogItem[];
+}
+
+export default function catalogPlugin(
+  context: LoadContext,
+  options: {dataPath: string},
+): Plugin<CatalogContent> {
+  return {
+    name: 'my-catalog-plugin',
+
+    // Step 1: Load raw content (untranslated)
+    async loadContent(): Promise<CatalogContent> {
+      const dataFile = path.resolve(context.siteDir, options.dataPath);
+      const raw = await readFile(dataFile, 'utf8');
+      return JSON.parse(raw);
+    },
+
+    // Step 2: Declare translatable strings
+    async getTranslationFiles({
+      content,
+    }): Promise<TranslationFile[]> {
+      return [
+        {
+          path: 'catalog',
+          content: {
+            sectionTitle: {
+              message: content.sectionTitle,
+              description: 'Title shown above the catalog section',
+            },
+            ...Object.fromEntries(
+              content.items.flatMap((item) => [
+                [
+                  `item_${item.id}_title`,
+                  {message: item.title, description: `Title of catalog item ${item.id}`},
+                ],
+                [
+                  `item_${item.id}_summary`,
+                  {message: item.summary, description: `Summary of catalog item ${item.id}`},
+                ],
+              ]),
+            ),
+          },
+        },
+      ];
+    },
+
+    // Step 3: Apply translations to content
+    translateContent({content, translationFiles}): CatalogContent {
+      const catalog = translationFiles.find((f) => f.path === 'catalog');
+      if (!catalog) return content;
+
+      return {
+        sectionTitle:
+          catalog.content.sectionTitle?.message ?? content.sectionTitle,
+        items: content.items.map((item) => ({
+          ...item,
+          title:
+            catalog.content[`item_${item.id}_title`]?.message ?? item.title,
+          summary:
+            catalog.content[`item_${item.id}_summary`]?.message ??
+            item.summary,
+        })),
+      };
+    },
+
+    // Step 4: Register routes using (now-translated) content
+    async contentLoaded({content, actions}) {
+      const {createData, addRoute} = actions;
+
+      const dataPath = await createData(
+        'catalog.json',
+        JSON.stringify(content),
+      );
+
+      addRoute({
+        path: '/catalog',
+        component: '@site/src/components/CatalogPage.tsx',
+        modules: {catalog: dataPath},
+        exact: true,
+      });
+    },
+  };
+}
+```
+
+```javascript my-catalog-plugin/src/index.js
+import path from 'path';
+import {readFile} from 'fs/promises';
+
+export default function catalogPlugin(context, options) {
+  return {
+    name: 'my-catalog-plugin',
+
+    async loadContent() {
+      const dataFile = path.resolve(context.siteDir, options.dataPath);
+      const raw = await readFile(dataFile, 'utf8');
+      return JSON.parse(raw);
+    },
+
+    async getTranslationFiles({content}) {
+      return [
+        {
+          path: 'catalog',
+          content: {
+            sectionTitle: {
+              message: content.sectionTitle,
+              description: 'Title shown above the catalog section',
+            },
+            ...Object.fromEntries(
+              content.items.flatMap((item) => [
+                [
+                  `item_${item.id}_title`,
+                  {message: item.title, description: `Title of catalog item ${item.id}`},
+                ],
+                [
+                  `item_${item.id}_summary`,
+                  {message: item.summary, description: `Summary of catalog item ${item.id}`},
+                ],
+              ]),
+            ),
+          },
+        },
+      ];
+    },
+
+    translateContent({content, translationFiles}) {
+      const catalog = translationFiles.find((f) => f.path === 'catalog');
+      if (!catalog) return content;
+
+      return {
+        sectionTitle: catalog.content.sectionTitle?.message ?? content.sectionTitle,
+        items: content.items.map((item) => ({
+          ...item,
+          title: catalog.content[`item_${item.id}_title`]?.message ?? item.title,
+          summary: catalog.content[`item_${item.id}_summary`]?.message ?? item.summary,
+        })),
+      };
+    },
+
+    async contentLoaded({content, actions}) {
+      const {createData, addRoute} = actions;
+      const dataPath = await createData('catalog.json', JSON.stringify(content));
+      addRoute({
+        path: '/catalog',
+        component: '@site/src/components/CatalogPage.js',
+        modules: {catalog: dataPath},
+        exact: true,
+      });
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+### i18n workflow summary
+
+<AccordionGroup>
+  <Accordion title="Extracting translations (write-translations)">
+    Run `docusaurus write-translations --locale <locale>` to extract all strings. Docusaurus calls `getTranslationFiles` for each plugin and writes the result to `i18n/<locale>/<pluginName>/`.
+
+    ```bash
+    npx docusaurus write-translations --locale fr
+    # Writes: i18n/fr/my-catalog-plugin/catalog.json
+    ```
+  </Accordion>
+  <Accordion title="Translating the strings">
+    Open the generated JSON files and update each `message` value to the translated string. Leave `description` untouched — it is only for translators' reference and is never rendered.
+  </Accordion>
+  <Accordion title="Building the localized site">
+    Run `docusaurus build` or `docusaurus start --locale fr`. Docusaurus reads the translated files, passes them to `translateContent` and `translateThemeConfig`, and then calls `contentLoaded` with the translated content. The resulting pages are served under `/fr/`.
+  </Accordion>
+</AccordionGroup>

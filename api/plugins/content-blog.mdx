@@ -1,0 +1,332 @@
+---
+title: "plugin-content-blog: Blog Plugin Configuration Reference"
+description: "Complete option reference for @docusaurus/plugin-content-blog covering path, feeds, authors, tags, reading time, front matter, and all configuration fields."
+---
+
+`@docusaurus/plugin-content-blog` provides the full-featured blogging system built into Docusaurus. It reads Markdown and MDX post files, organizes them by date, generates tag pages, author pages, and produces RSS, Atom, and JSON feeds. The plugin is included in `@docusaurus/preset-classic` and requires no separate installation when using that preset.
+
+<Warning>
+The feed feature (RSS/Atom/JSON) operates on the build output and is **only active in production**. It will not generate feeds during `docusaurus start`.
+</Warning>
+
+## Installation
+
+```bash npm2yarn
+npm install --save @docusaurus/plugin-content-blog
+```
+
+<Tip>
+If you use `@docusaurus/preset-classic`, configure this plugin through the `blog` preset key instead of adding it to the `plugins` array.
+</Tip>
+
+## Configuration options
+
+### Content and routing
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `path` | `string` | `'blog'` | Path to the blog content directory on the filesystem, relative to the site directory. |
+| `routeBasePath` | `string` | `'blog'` | URL route for the blog section. Do **not** include a trailing slash. Use `/` to serve the blog from the site root. |
+| `tagsBasePath` | `string` | `'tags'` | URL route for the tags section, appended to `routeBasePath`. |
+| `pageBasePath` | `string` | `'page'` | URL route for paginated list pages, appended to `routeBasePath`. |
+| `archiveBasePath` | `string \| null` | `'archive'` | URL route for the archive page, appended to `routeBasePath`. Set `null` to disable the archive. |
+| `authorsBasePath` | `string` | `'authors'` | URL route for author pages, appended to `routeBasePath`. |
+| `include` | `string[]` | `['**/*.{md,mdx}']` | Glob patterns for blog post files to include, relative to the content path. |
+| `exclude` | `string[]` | see example | Glob patterns for files to exclude. Refines the `include` list. |
+
+### Display options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `blogTitle` | `string` | `'Blog'` | Page title for the blog listing page, used in SEO metadata. |
+| `blogDescription` | `string` | `'Blog'` | Meta description for the blog listing page. |
+| `blogSidebarCount` | `number \| 'ALL'` | `5` | Number of recent posts shown in the blog sidebar. Use `'ALL'` to show all posts, `0` to disable the sidebar. |
+| `blogSidebarTitle` | `string` | `'Recent posts'` | Title text shown above the blog sidebar list. |
+| `postsPerPage` | `number \| 'ALL'` | `10` | Number of posts shown per listing page. Use `'ALL'` to display all posts on a single page. |
+| `showReadingTime` | `boolean` | `true` | Display an estimated reading time on each blog post. |
+| `readingTime` | `ReadingTimeFn` | built-in | Custom function to calculate or format the reading time number. |
+| `truncateMarker` | `RegExp` | `/<!--\s*truncate\s*-->/` | Marker used to split blog post content into a summary and full content. |
+| `sortPosts` | `'descending' \| 'ascending'` | `'descending'` | Sort order for blog posts by date. |
+
+### Edit links
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `editUrl` | `string \| EditUrlFn` | `undefined` | Base URL for "Edit this page" links. A function receives `{blogDirPath, blogPath, permalink, locale}`. Omit to disable edit links. |
+| `editLocalizedFiles` | `boolean` | `false` | When `true`, edit links target the localized file. Ignored when `editUrl` is a function. |
+
+### Last update metadata
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `showLastUpdateAuthor` | `boolean` | `false` | Display the author of the last git commit for each post. |
+| `showLastUpdateTime` | `boolean` | `false` | Display the date of the last git commit for each post. Requires full git history. |
+
+### Authors and tags
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `authorsMapPath` | `string` | `'authors.yml'` | Path to the global authors YAML file, relative to the blog content directory. |
+| `tags` | `string \| false \| null` | `'tags.yml'` | Path to a YAML file defining pre-defined tags, relative to the blog content directory. |
+| `onInlineTags` | `'ignore' \| 'log' \| 'warn' \| 'throw'` | `'warn'` | Behavior when posts use tags not declared in the pre-defined tags file. |
+| `onUntruncatedBlogPosts` | `'ignore' \| 'log' \| 'warn' \| 'throw'` | `'warn'` | Behavior when posts do not contain a truncate marker. |
+
+### Feed options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `feedOptions.type` | `FeedType \| FeedType[] \| 'all' \| null` | `['rss', 'atom']` | Feed format(s) to generate. Use `null` to disable feed generation. |
+| `feedOptions.title` | `string` | `siteConfig.title` | Feed title. |
+| `feedOptions.description` | `string` | `"${siteConfig.title} Blog"` | Feed description. |
+| `feedOptions.copyright` | `string` | `undefined` | Copyright string appended to the feed. |
+| `feedOptions.language` | `string` | `undefined` | BCP 47 language code for the feed. |
+| `feedOptions.limit` | `number \| null \| false` | `20` | Maximum number of posts included in the feed. Use `null` or `false` for no limit. |
+| `feedOptions.xslt` | `boolean \| FeedXSLTOptions` | `undefined` | Style XML feeds with XSLT so browsers render them attractively. |
+| `feedOptions.createFeedItems` | `CreateFeedItemsFn` | `undefined` | Custom function to transform or filter feed items before they are written. |
+
+### Processing and components
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `processBlogPosts` | `ProcessBlogPostsFn` | `undefined` | Optional function to filter, transform, or delete posts after they are loaded. |
+| `blogListComponent` | `string` | `'@theme/BlogListPage'` | Root component of the blog listing page. |
+| `blogPostComponent` | `string` | `'@theme/BlogPostPage'` | Root component of each individual blog post page. |
+| `blogTagsListComponent` | `string` | `'@theme/BlogTagsListPage'` | Root component of the tags list page. |
+| `blogTagsPostsComponent` | `string` | `'@theme/BlogTagsPostsPage'` | Root component of the "posts with tag X" page. |
+| `blogArchiveComponent` | `string` | `'@theme/BlogArchivePage'` | Root component of the blog archive page. |
+| `blogAuthorsPostsComponent` | `string` | `'@theme/Blog/Pages/BlogAuthorsPostsPage'` | Root component of an individual author's posts page. |
+| `blogAuthorsListComponent` | `string` | `'@theme/Blog/Pages/BlogAuthorsListPage'` | Root component of the authors index page. |
+| `remarkPlugins` | `any[]` | `[]` | Remark plugins passed to the MDX processor. |
+| `rehypePlugins` | `any[]` | `[]` | Rehype plugins passed to the MDX processor. |
+| `recmaPlugins` | `any[]` | `[]` | Recma plugins passed to the MDX processor. |
+| `beforeDefaultRemarkPlugins` | `any[]` | `[]` | Remark plugins injected before Docusaurus's built-in Remark plugins. |
+| `beforeDefaultRehypePlugins` | `any[]` | `[]` | Rehype plugins injected before Docusaurus's built-in Rehype plugins. |
+
+## Type definitions
+
+<AccordionGroup>
+  <Accordion title="FeedType">
+
+```ts
+type FeedType = 'rss' | 'atom' | 'json';
+```
+
+  </Accordion>
+  <Accordion title="FeedXSLTOptions">
+
+```ts
+type FeedXSLTOptions =
+  | boolean
+  | undefined
+  | null
+  | {
+      rss?: string | boolean | null | undefined;
+      atom?: string | boolean | null | undefined;
+    };
+```
+
+Use `true` to apply the built-in `.xsl` and `.css` stylesheets. Pass a path string (relative to the blog content folder) to use a custom `.xsl` file — a matching `.css` file with the same base name must also be present.
+
+  </Accordion>
+  <Accordion title="CreateFeedItemsFn">
+
+```ts
+type CreateFeedItemsFn = (params: {
+  blogPosts: BlogPost[];
+  siteConfig: DocusaurusConfig;
+  outDir: string;
+  defaultCreateFeedItemsFn: CreateFeedItemsFn;
+}) => Promise<BlogFeedItem[]>;
+```
+
+  </Accordion>
+  <Accordion title="ReadingTimeFn">
+
+```ts
+type ReadingTimeOptions = {
+  wordsPerMinute: number;
+};
+
+type ReadingTimeCalculator = (params: {
+  content: string;
+  locale: string;
+  frontMatter?: BlogPostFrontMatter & Record<string, unknown>;
+  options?: ReadingTimeOptions;
+}) => number;
+
+type ReadingTimeFn = (params: {
+  content: string;
+  locale: string;
+  frontMatter: BlogPostFrontMatter & Record<string, unknown>;
+  defaultReadingTime: ReadingTimeCalculator;
+}) => number | undefined;
+```
+
+  </Accordion>
+  <Accordion title="ProcessBlogPostsFn">
+
+```ts
+type ProcessBlogPostsFn = (params: {
+  blogPosts: BlogPost[];
+}) => Promise<void | BlogPost[]>;
+```
+
+  </Accordion>
+  <Accordion title="EditUrlFn">
+
+```ts
+type EditUrlFunction = (params: {
+  blogDirPath: string;
+  blogPath: string;
+  permalink: string;
+  locale: string;
+}) => string | undefined;
+```
+
+  </Accordion>
+</AccordionGroup>
+
+## Example configuration
+
+<Tabs>
+  <Tab title="Preset options (recommended)">
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        blog: {
+          path: 'blog',
+          routeBasePath: 'blog',
+          blogTitle: 'Engineering Blog',
+          blogDescription: 'Updates and articles from the engineering team.',
+          blogSidebarCount: 10,
+          blogSidebarTitle: 'Recent posts',
+          postsPerPage: 10,
+          showReadingTime: true,
+          editUrl: ({locale, blogDirPath, blogPath}) =>
+            `https://github.com/your-org/your-repo/edit/main/website/${blogDirPath}/${blogPath}`,
+          feedOptions: {
+            type: ['rss', 'atom'],
+            copyright: `Copyright © ${new Date().getFullYear()} Your Company`,
+            limit: 20,
+          },
+          authorsMapPath: 'authors.yml',
+          sortPosts: 'descending',
+        },
+      },
+    ],
+  ],
+};
+```
+
+  </Tab>
+  <Tab title="Standalone plugin">
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: [
+    [
+      '@docusaurus/plugin-content-blog',
+      {
+        id: 'releases',
+        path: 'releases',
+        routeBasePath: 'releases',
+        blogTitle: 'Release Notes',
+        postsPerPage: 'ALL',
+        blogSidebarCount: 0,
+        feedOptions: {type: null},
+      },
+    ],
+  ],
+};
+```
+
+  </Tab>
+</Tabs>
+
+## Markdown front matter
+
+Individual blog post files can use the following front matter fields.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `title` | `string` | Markdown heading | Blog post display title. |
+| `title_meta` | `string` | `title` | Override the SEO `<title>` and `og:title` independently from the displayed title. |
+| `authors` | `Authors` | `undefined` | Post author(s). Accepts an author key, an inline author object, or an array of both. |
+| `date` | `string` | filename or file creation time | Post date. Can be extracted from the filename (e.g. `2024-01-15-my-post.mdx`) or set explicitly. |
+| `tags` | `Tag[]` | `undefined` | Tags to apply. Strings may reference keys from `tags.yml`. |
+| `draft` | `boolean` | `false` | Draft posts are only available in development. |
+| `unlisted` | `boolean` | `false` | Unlisted posts are hidden from navigation and sitemaps but reachable via direct URL. |
+| `slug` | `string` | file path | Custom URL path for the post. |
+| `description` | `string` | first line of content | `<meta name="description">` and OpenGraph description. |
+| `keywords` | `string[]` | `undefined` | `<meta name="keywords">` content. |
+| `image` | `string` | `undefined` | OpenGraph `og:image` for social link previews. |
+| `sidebar_label` | `string` | `title` | Custom label for this post in the blog sidebar. |
+| `hide_table_of_contents` | `boolean` | `false` | Hide the table of contents panel. |
+| `toc_min_heading_level` | `number` | `2` | Minimum heading level in the TOC. |
+| `toc_max_heading_level` | `number` | `3` | Maximum heading level in the TOC. |
+| `last_update` | `FrontMatterLastUpdate` | `undefined` | Manually override the last update author or date. |
+
+### Authors type
+
+```ts
+type AuthorKey = string;
+
+type AuthorSocials = Record<string, string>;
+
+type Author = {
+  key?: AuthorKey;
+  name: string;
+  title?: string;
+  url?: string;
+  image_url?: string;
+  socials?: AuthorSocials;
+};
+
+type Authors = AuthorKey | Author | (AuthorKey | Author)[];
+```
+
+## Authors file (`authors.yml`)
+
+Define global reusable authors in a YAML file at the root of your blog content directory. The path is controlled by the `authorsMapPath` option.
+
+```yaml title="blog/authors.yml"
+slorber:
+  name: Sébastien Lorber
+  title: Docusaurus maintainer
+  url: https://sebastienlorber.com
+  image_url: https://github.com/slorber.png
+  page: true
+  socials:
+    github: slorber
+    x: sebastienlorber
+
+jmarcey:
+  name: Joel Marcey
+  title: Co-creator of Docusaurus 1
+  url: https://github.com/JoelMarcey
+  image_url: https://github.com/JoelMarcey.png
+  page:
+    permalink: '/authors/joel-marcey'
+  socials:
+    github: JoelMarcey
+```
+
+Reference an author in a post using their key:
+
+```md title="blog/2024-01-15-hello.md"
+---
+title: Hello World
+authors: [slorber, jmarcey]
+tags: [docusaurus, release]
+---
+
+Post content here.
+```
+
+## i18n
+
+Translated blog posts live under `website/i18n/[locale]/docusaurus-plugin-content-blog/`. For multi-instance setups, the folder name becomes `docusaurus-plugin-content-blog-[pluginId]`.

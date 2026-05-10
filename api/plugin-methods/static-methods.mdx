@@ -1,0 +1,458 @@
+---
+title: "Static Methods for Docusaurus Plugin Validation"
+description: "Reference for validateOptions and validateThemeConfig static methods used to validate and normalize Docusaurus plugin options and theme configuration with Joi."
+---
+
+Static methods are attached to the plugin module's constructor function itself rather than to any plugin instance. Docusaurus calls them before it initializes plugins, which means they run even before the plugin constructor receives its `context` and `options` arguments. Their main responsibility is to validate user-supplied configuration and return a canonical, normalized form that the rest of the plugin can rely on.
+
+## Plugin module structure
+
+A complete plugin module exports a default constructor and, optionally, one or both static methods as named exports:
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import type {
+  LoadContext,
+  Plugin,
+  OptionValidationContext,
+  ThemeConfigValidationContext,
+} from '@docusaurus/types';
+import {Joi} from '@docusaurus/utils-validation';
+
+export interface MyPluginOptions {
+  path: string;
+  include: string[];
+}
+
+// Default export: the plugin constructor
+export default function myPlugin(
+  context: LoadContext,
+  options: MyPluginOptions,
+): Plugin {
+  return {
+    name: 'my-plugin',
+    // lifecycle methods
+  };
+}
+
+// Named export: option validation
+export function validateOptions({
+  options,
+  validate,
+}: OptionValidationContext<MyPluginOptions, MyPluginOptions>): MyPluginOptions {
+  const schema = Joi.object<MyPluginOptions>({
+    path: Joi.string().default('docs'),
+    include: Joi.array().items(Joi.string()).default(['**/*.md']),
+  });
+  return validate(schema, options);
+}
+```
+
+```javascript my-plugin/src/index.js
+import {Joi} from '@docusaurus/utils-validation';
+
+// Default export: the plugin constructor
+export default function myPlugin(context, options) {
+  return {
+    name: 'my-plugin',
+    // lifecycle methods
+  };
+}
+
+// Named export: option validation
+export function validateOptions({options, validate}) {
+  const schema = Joi.object({
+    path: Joi.string().default('docs'),
+    include: Joi.array().items(Joi.string()).default(['**/*.md']),
+  });
+  return validate(schema, options);
+}
+```
+
+</CodeGroup>
+
+---
+
+## `validateOptions({options, validate})`
+
+Called before the plugin is initialized. Returns the validated and normalized options that Docusaurus will pass to the plugin constructor.
+
+```typescript
+validateOptions?: <In, Out>(
+  data: OptionValidationContext<In, Out>,
+) => Out;
+
+type OptionValidationContext<In, Out> = {
+  validate: Validate<In, Out>;
+  options: In;
+};
+
+type Validate<In, Out> = (
+  validationSchema: Joi.ObjectSchema<Out>,
+  options: In,
+) => Out;
+```
+
+### `options`
+
+The raw options object provided by the user in `docusaurus.config.js`. This is the value you validate and normalize.
+
+### `validate`
+
+A function that accepts a Joi schema and the raw options, then returns validated and normalized options. It automatically handles Joi errors and formats them as useful error messages.
+
+<Tip>
+Use `import {Joi} from '@docusaurus/utils-validation'` rather than installing Joi directly. This ensures you use the exact Joi version Docusaurus expects and avoids version conflicts that produce confusing validation errors.
+</Tip>
+
+### Using Joi for validation
+
+Joi schemas let you declare the shape of your options, apply default values, mark fields as required, and coerce types — all in one place:
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import {Joi} from '@docusaurus/utils-validation';
+import type {OptionValidationContext} from '@docusaurus/types';
+
+export interface MyPluginOptions {
+  path: string;
+  routeBasePath: string;
+  include: string[];
+  exclude: string[];
+  remarkPlugins: unknown[];
+  showLastUpdateAuthor: boolean;
+}
+
+const DEFAULT_OPTIONS: Partial<MyPluginOptions> = {
+  routeBasePath: 'docs',
+  include: ['**/*.{md,mdx}'],
+  exclude: [],
+  remarkPlugins: [],
+  showLastUpdateAuthor: false,
+};
+
+const OptionsSchema = Joi.object<MyPluginOptions>({
+  path: Joi.string().required(),
+  routeBasePath: Joi.string().default(DEFAULT_OPTIONS.routeBasePath),
+  include: Joi.array()
+    .items(Joi.string())
+    .default(DEFAULT_OPTIONS.include),
+  exclude: Joi.array()
+    .items(Joi.string())
+    .default(DEFAULT_OPTIONS.exclude),
+  remarkPlugins: Joi.array().default(DEFAULT_OPTIONS.remarkPlugins),
+  showLastUpdateAuthor: Joi.boolean().default(
+    DEFAULT_OPTIONS.showLastUpdateAuthor,
+  ),
+});
+
+export function validateOptions({
+  options,
+  validate,
+}: OptionValidationContext<MyPluginOptions, MyPluginOptions>): MyPluginOptions {
+  return validate(OptionsSchema, options);
+}
+```
+
+```javascript my-plugin/src/index.js
+import {Joi} from '@docusaurus/utils-validation';
+
+const OptionsSchema = Joi.object({
+  path: Joi.string().required(),
+  routeBasePath: Joi.string().default('docs'),
+  include: Joi.array().items(Joi.string()).default(['**/*.{md,mdx}']),
+  exclude: Joi.array().items(Joi.string()).default([]),
+  remarkPlugins: Joi.array().default([]),
+  showLastUpdateAuthor: Joi.boolean().default(false),
+});
+
+export function validateOptions({options, validate}) {
+  return validate(OptionsSchema, options);
+}
+```
+
+</CodeGroup>
+
+### Validating without Joi
+
+If you prefer not to use Joi, you can validate manually and throw an `Error` for invalid input:
+
+```javascript
+export function validateOptions({options, validate}) {
+  if (!options.path || typeof options.path !== 'string') {
+    throw new Error(
+      '[my-plugin] The "path" option is required and must be a string.',
+    );
+  }
+  return {
+    path: options.path,
+    routeBasePath: options.routeBasePath ?? 'docs',
+  };
+}
+```
+
+<Note>
+When `validateOptions` is not exported, the raw user-supplied options are passed directly to the plugin constructor without any normalization. Always export `validateOptions` to catch configuration mistakes early and provide meaningful error messages.
+</Note>
+
+---
+
+## `validateThemeConfig({themeConfig, validate})`
+
+Called before plugin initialization to validate and normalize the `themeConfig` field from `docusaurus.config.js`. Returns the validated and normalized theme config.
+
+```typescript
+validateThemeConfig?: <In, Out = In>(
+  data: ThemeConfigValidationContext<In, Out>,
+) => Out;
+
+type ThemeConfigValidationContext<In, Out = In> = {
+  validate: Validate<In, Out>;
+  themeConfig: In;
+};
+```
+
+### `themeConfig`
+
+The raw `themeConfig` object from the user's `docusaurus.config.js`. Only validate the keys your theme or plugin owns — ignore the rest so that other plugins' keys are not accidentally stripped.
+
+### `validate`
+
+Identical in behavior to the `validate` function passed to `validateOptions`: accepts a Joi schema and the raw config, returns a validated result.
+
+<Tip>
+Scope your Joi schema with `Joi.object({myPlugin: ...}).unknown()` so that keys belonging to other themes or plugins pass through untouched.
+</Tip>
+
+### Example
+
+<CodeGroup>
+
+```typescript my-theme/src/index.ts
+import {Joi} from '@docusaurus/utils-validation';
+import type {ThemeConfigValidationContext} from '@docusaurus/types';
+
+export interface MyThemeConfig {
+  myTheme: {
+    primaryColor: string;
+    darkMode: boolean;
+    navbar: {title: string; logo?: {src: string; alt: string}};
+  };
+}
+
+const ThemeConfigSchema = Joi.object<MyThemeConfig>({
+  myTheme: Joi.object({
+    primaryColor: Joi.string().default('#2e8555'),
+    darkMode: Joi.boolean().default(true),
+    navbar: Joi.object({
+      title: Joi.string().required(),
+      logo: Joi.object({
+        src: Joi.string().required(),
+        alt: Joi.string().default(''),
+      }).optional(),
+    }).required(),
+  })
+    .required()
+    .label('themeConfig.myTheme'),
+}).unknown(); // pass through keys owned by other plugins
+
+export function validateThemeConfig({
+  themeConfig,
+  validate,
+}: ThemeConfigValidationContext<MyThemeConfig>): MyThemeConfig {
+  return validate(ThemeConfigSchema, themeConfig);
+}
+```
+
+```javascript my-theme/src/index.js
+import {Joi} from '@docusaurus/utils-validation';
+
+const ThemeConfigSchema = Joi.object({
+  myTheme: Joi.object({
+    primaryColor: Joi.string().default('#2e8555'),
+    darkMode: Joi.boolean().default(true),
+    navbar: Joi.object({
+      title: Joi.string().required(),
+      logo: Joi.object({
+        src: Joi.string().required(),
+        alt: Joi.string().default(''),
+      }).optional(),
+    }).required(),
+  })
+    .required()
+    .label('themeConfig.myTheme'),
+}).unknown();
+
+export function validateThemeConfig({themeConfig, validate}) {
+  return validate(ThemeConfigSchema, themeConfig);
+}
+```
+
+</CodeGroup>
+
+---
+
+## Complete plugin module example
+
+The following example shows a complete plugin module with both static methods and the main lifecycle methods working together.
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import path from 'path';
+import {Joi} from '@docusaurus/utils-validation';
+import type {
+  LoadContext,
+  Plugin,
+  OptionValidationContext,
+  ThemeConfigValidationContext,
+} from '@docusaurus/types';
+
+// ---------- Types ----------
+
+export interface MyPluginOptions {
+  path: string;
+  routeBasePath: string;
+}
+
+export interface MyThemeConfig {
+  myPlugin: {showBreadcrumbs: boolean};
+}
+
+type MyContent = {items: string[]};
+
+// ---------- Validation schemas ----------
+
+const OptionsSchema = Joi.object<MyPluginOptions>({
+  path: Joi.string().required(),
+  routeBasePath: Joi.string().default('my-plugin'),
+});
+
+const ThemeConfigSchema = Joi.object<MyThemeConfig>({
+  myPlugin: Joi.object({
+    showBreadcrumbs: Joi.boolean().default(true),
+  }).default(),
+}).unknown();
+
+// ---------- Plugin constructor (default export) ----------
+
+export default function myPlugin(
+  context: LoadContext,
+  options: MyPluginOptions,
+): Plugin<MyContent> {
+  return {
+    name: 'my-plugin',
+
+    async loadContent(): Promise<MyContent> {
+      const contentPath = path.resolve(context.siteDir, options.path);
+      // ...read files from contentPath
+      return {items: []};
+    },
+
+    async contentLoaded({content, actions}) {
+      const {createData, addRoute} = actions;
+      const dataPath = await createData('items.json', JSON.stringify(content));
+      addRoute({
+        path: `/${options.routeBasePath}`,
+        component: '@site/src/components/MyPage.tsx',
+        modules: {items: dataPath},
+        exact: true,
+      });
+    },
+  };
+}
+
+// ---------- Static methods (named exports) ----------
+
+export function validateOptions({
+  options,
+  validate,
+}: OptionValidationContext<MyPluginOptions, MyPluginOptions>): MyPluginOptions {
+  return validate(OptionsSchema, options);
+}
+
+export function validateThemeConfig({
+  themeConfig,
+  validate,
+}: ThemeConfigValidationContext<MyThemeConfig>): MyThemeConfig {
+  return validate(ThemeConfigSchema, themeConfig);
+}
+```
+
+```javascript my-plugin/src/index.js
+import path from 'path';
+import {Joi} from '@docusaurus/utils-validation';
+
+const OptionsSchema = Joi.object({
+  path: Joi.string().required(),
+  routeBasePath: Joi.string().default('my-plugin'),
+});
+
+const ThemeConfigSchema = Joi.object({
+  myPlugin: Joi.object({
+    showBreadcrumbs: Joi.boolean().default(true),
+  }).default(),
+}).unknown();
+
+export default function myPlugin(context, options) {
+  return {
+    name: 'my-plugin',
+
+    async loadContent() {
+      const contentPath = path.resolve(context.siteDir, options.path);
+      // ...read files from contentPath
+      return {items: []};
+    },
+
+    async contentLoaded({content, actions}) {
+      const {createData, addRoute} = actions;
+      const dataPath = await createData('items.json', JSON.stringify(content));
+      addRoute({
+        path: `/${options.routeBasePath}`,
+        component: '@site/src/components/MyPage.js',
+        modules: {items: dataPath},
+        exact: true,
+      });
+    },
+  };
+}
+
+export function validateOptions({options, validate}) {
+  return validate(OptionsSchema, options);
+}
+
+export function validateThemeConfig({themeConfig, validate}) {
+  return validate(ThemeConfigSchema, themeConfig);
+}
+```
+
+</CodeGroup>
+
+Registering this plugin in `docusaurus.config.js`:
+
+```javascript docusaurus.config.js
+export default {
+  plugins: [
+    ['./my-plugin', {path: 'content', routeBasePath: 'items'}],
+  ],
+  themeConfig: {
+    myPlugin: {showBreadcrumbs: false},
+  },
+};
+```
+
+<AccordionGroup>
+  <Accordion title="Execution order of static methods">
+    Static methods run in this order before any plugin instance is created:
+
+    1. `validateOptions` — called once per plugin instance with the raw user options.
+    2. `validateThemeConfig` — called once per plugin module with the site's `themeConfig`.
+
+    Both methods run before the plugin constructor is called. This means the constructor always receives validated, normalized values.
+  </Accordion>
+  <Accordion title="When to throw vs. return from validation">
+    The `validate` helper throws a `ValidationError` automatically when the Joi schema fails. If you validate without Joi, throw a plain `Error` with a descriptive message that names the plugin and the offending option. Never silently swallow bad input — users need to know what is wrong and where.
+  </Accordion>
+</AccordionGroup>

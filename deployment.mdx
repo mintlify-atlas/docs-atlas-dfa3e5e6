@@ -1,0 +1,342 @@
+---
+title: "Deploy Your Docusaurus Site"
+description: "Build your Docusaurus site and deploy it to GitHub Pages, Netlify, Vercel, or a self-hosted server with step-by-step instructions for each platform."
+---
+
+Docusaurus generates a folder of static files that can be hosted anywhere a web server can serve HTML. After running the build command, you copy the output to your host of choice — Docusaurus itself has no runtime server-side component.
+
+## Build the site
+
+Before deploying, compile your source files into static output:
+
+<CodeGroup>
+  ```bash npm
+  npm run build
+  ```
+
+  ```bash yarn
+  yarn build
+  ```
+
+  ```bash pnpm
+  pnpm run build
+  ```
+</CodeGroup>
+
+The generated files land in `build/`. You can verify the output locally before uploading:
+
+<CodeGroup>
+  ```bash npm
+  npm run serve
+  ```
+
+  ```bash yarn
+  yarn serve
+  ```
+
+  ```bash pnpm
+  pnpm run serve
+  ```
+</CodeGroup>
+
+This serves `build/` at [http://localhost:3000](http://localhost:3000) and is the closest approximation of production you can run on your machine.
+
+<Warning>
+  Make sure `url` and `baseUrl` in `docusaurus.config.js` match your deployment target before building. Incorrect values cause broken asset paths and wrong canonical URLs.
+</Warning>
+
+## Required config fields
+
+Two fields in `docusaurus.config.js` must be correct for your host:
+
+| Field | Description |
+|---|---|
+| `url` | The root of your site, without a trailing slash. For `https://my-org.com/my-project/`, this is `https://my-org.com`. |
+| `baseUrl` | The path prefix, with a trailing slash. For the same site, this is `/my-project/`. For a domain root, use `'/'`. |
+
+## Deployment targets
+
+<Tabs>
+  <Tab title="GitHub Pages">
+    GitHub Pages is free for all public repositories and is built into every GitHub account. The `docusaurus deploy` command automates the entire process: it builds the site and pushes the output to the deployment branch in one step.
+
+    <Steps>
+      <Step title="Configure docusaurus.config.js">
+        Add the three required fields for GitHub Pages deployment:
+
+        ```js title="docusaurus.config.js"
+        export default {
+          url: 'https://my-org.github.io',
+          baseUrl: '/my-project/',
+          organizationName: 'my-org',   // GitHub org or username
+          projectName: 'my-project',    // Repository name
+          trailingSlash: false,
+        };
+        ```
+
+        For an organization root site (repo named `my-org.github.io`), use `baseUrl: '/'` and omit `projectName` or set it to the repo name.
+      </Step>
+
+      <Step title="Prevent Jekyll processing">
+        GitHub Pages runs files through Jekyll by default, which strips files whose names begin with `_`. Add an empty `.nojekyll` file to your `static/` directory to disable this:
+
+        ```bash
+        touch static/.nojekyll
+        ```
+      </Step>
+
+      <Step title="Run the deploy command">
+        Set `GIT_USER` to your GitHub username, then run:
+
+        <Tabs>
+          <Tab title="Bash / macOS / Linux">
+            ```bash
+            GIT_USER=<your-github-username> yarn deploy
+            ```
+          </Tab>
+          <Tab title="Windows (cmd)">
+            ```batch
+            cmd /C "set "GIT_USER=<your-github-username>" && yarn deploy"
+            ```
+          </Tab>
+          <Tab title="PowerShell">
+            ```powershell
+            cmd /C 'set "GIT_USER=<your-github-username>" && yarn deploy'
+            ```
+          </Tab>
+        </Tabs>
+
+        The command clones the repo, builds the site, commits the output to the `gh-pages` branch, and pushes.
+
+        <Note>
+          GitHub requires a **personal access token** (PAT) instead of a password for command-line authentication. When prompted for a password, enter your PAT. Alternatively, set `USE_SSH=true` to authenticate over SSH instead.
+        </Note>
+      </Step>
+
+      <Step title="Automate with GitHub Actions (optional)">
+        Add this workflow file to trigger a deployment on every push to `main`:
+
+        ```yml title=".github/workflows/deploy.yml"
+        name: Deploy to GitHub Pages
+
+        on:
+          push:
+            branches:
+              - main
+
+        jobs:
+          build:
+            name: Build Docusaurus
+            runs-on: ubuntu-latest
+            steps:
+              - uses: actions/checkout@v4
+                with:
+                  fetch-depth: 0
+              - uses: actions/setup-node@v4
+                with:
+                  node-version: 20
+                  cache: npm
+              - name: Install dependencies
+                run: npm ci
+              - name: Build website
+                run: npm run build
+              - name: Upload build artifact
+                uses: actions/upload-pages-artifact@v3
+                with:
+                  path: build
+
+          deploy:
+            name: Deploy to GitHub Pages
+            needs: build
+            permissions:
+              pages: write
+              id-token: write
+            environment:
+              name: github-pages
+              url: ${{ steps.deployment.outputs.page_url }}
+            runs-on: ubuntu-latest
+            steps:
+              - name: Deploy to GitHub Pages
+                id: deployment
+                uses: actions/deploy-pages@v4
+        ```
+
+        Also add a test workflow for pull requests to catch broken builds before merge:
+
+        ```yml title=".github/workflows/test-deploy.yml"
+        name: Test deployment
+
+        on:
+          pull_request:
+            branches:
+              - main
+
+        jobs:
+          test-deploy:
+            name: Test deployment
+            runs-on: ubuntu-latest
+            steps:
+              - uses: actions/checkout@v4
+                with:
+                  fetch-depth: 0
+              - uses: actions/setup-node@v4
+                with:
+                  node-version: 20
+                  cache: npm
+              - name: Install dependencies
+                run: npm ci
+              - name: Test build website
+                run: npm run build
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Netlify">
+    Netlify auto-deploys from your Git repository on every push and provides deploy previews for pull requests.
+
+    <Steps>
+      <Step title="Configure url and baseUrl">
+        Set the fields to match your Netlify domain:
+
+        ```js title="docusaurus.config.js"
+        export default {
+          url: 'https://my-site.netlify.app',
+          baseUrl: '/',
+        };
+        ```
+      </Step>
+
+      <Step title="Create a Netlify site">
+        Log in to Netlify, click **Add new site**, connect your Git repository, and set:
+
+        - **Build command:** `npm run build`
+        - **Publish directory:** `build`
+      </Step>
+
+      <Step title="Disable Pretty URLs">
+        Netlify's **Pretty URLs** feature rewrites paths to lowercase and adds trailing slashes, which conflicts with Docusaurus's routing. In your Netlify site settings, go to **Post Processing → Asset Optimization** and **uncheck Pretty URLs independently** — the global "Disable asset optimization" checkbox does not affect it.
+      </Step>
+
+      <Step title="Handle monorepos (if applicable)">
+        If your `docs/` folder sits outside the Docusaurus root, add a custom ignore command so Netlify triggers builds when docs change:
+
+        ```toml title="website/netlify.toml"
+        [build]
+          ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF . ../docs/"
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Vercel">
+    Vercel automatically detects Docusaurus and preconfigures build settings for you, including preview deployments for every branch and pull request.
+
+    <Steps>
+      <Step title="Push your site to a Git repository">
+        Vercel's Git integration reads from GitHub, GitLab, or Bitbucket. Make sure your project is pushed to one of these providers.
+      </Step>
+
+      <Step title="Import the project into Vercel">
+        In the Vercel dashboard, click **Add New → Project**, find your repository, and click **Import**. Vercel will auto-detect the Docusaurus framework and pre-fill:
+
+        - **Framework preset:** Docusaurus
+        - **Build command:** `npm run build`
+        - **Output directory:** `build`
+      </Step>
+
+      <Step title="Deploy">
+        Click **Deploy**. Vercel builds the site and assigns a `.vercel.app` subdomain. Every future push to the production branch (usually `main`) triggers a production deployment. Pushes to other branches create preview URLs automatically.
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Self-hosted">
+    For full control over server configuration, deploy the `build/` directory to your own server using a static file server, Nginx, or Apache.
+
+    <Steps>
+      <Step title="Build the site">
+        ```bash
+        npm run build
+        ```
+      </Step>
+
+      <Step title="Serve with docusaurus serve">
+        For a quick self-hosted option, Docusaurus ships its own serve command:
+
+        ```bash
+        npm run serve -- --build --port 80 --host 0.0.0.0
+        ```
+
+        <Warning>
+          `docusaurus serve` is convenient for testing but is not recommended for production. Use a CDN or a hardened reverse proxy like Nginx instead.
+        </Warning>
+      </Step>
+
+      <Step title="Serve with Nginx">
+        Copy the `build/` directory to your server's web root and add an Nginx virtual host:
+
+        ```nginx title="/etc/nginx/sites-available/my-site"
+        server {
+          listen 80;
+          server_name docs.example.com;
+          root /var/www/my-site/build;
+          index index.html;
+
+          location / {
+            try_files $uri $uri/ /index.html;
+          }
+        }
+        ```
+
+        Enable the site and reload Nginx:
+
+        ```bash
+        ln -s /etc/nginx/sites-available/my-site /etc/nginx/sites-enabled/
+        nginx -s reload
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Choosing a deployment target
+
+<CardGroup cols={2}>
+  <Card title="GitHub Pages" icon="github">
+    Free for public repos. Straightforward if your code is already on GitHub. The `docusaurus deploy` command and the GitHub Actions workflow handle everything automatically.
+  </Card>
+  <Card title="Netlify" icon="bolt">
+    Easiest setup overall. Generous free tier, automatic preview URLs for pull requests, and one-click rollbacks. Best for teams who want zero infrastructure work.
+  </Card>
+  <Card title="Vercel" icon="triangle">
+    Excellent performance and developer experience. Auto-detects Docusaurus. Preview deployments and edge caching on the free plan.
+  </Card>
+  <Card title="Self-hosted" icon="server">
+    Full control over server configuration, redirects, authentication, and custom middleware. Most complex to maintain, but the only option when data cannot leave your infrastructure.
+  </Card>
+</CardGroup>
+
+## Environment variables in builds
+
+`docusaurus.config.js` is the only file that runs in Node.js during the build — MDX pages and React components are client-side and cannot read `process.env` directly. Pass environment variables through `customFields`:
+
+```js title="docusaurus.config.js"
+import 'dotenv/config';
+
+export default {
+  url: process.env.SITE_URL,
+  customFields: {
+    apiEndpoint: process.env.API_ENDPOINT,
+  },
+};
+```
+
+```jsx title="src/pages/index.jsx"
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+
+export default function Home() {
+  const {siteConfig: {customFields}} = useDocusaurusContext();
+  return <p>API: {customFields.apiEndpoint}</p>;
+}
+```

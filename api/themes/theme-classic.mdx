@@ -1,0 +1,242 @@
+---
+title: "@docusaurus/theme-classic: Complete UI Theme Reference"
+description: "Full reference for @docusaurus/theme-classic — installation, configuration, swizzlable components, Infima CSS integration, and custom CSS variable overrides."
+---
+
+`@docusaurus/theme-classic` is the default and only production-ready Docusaurus main theme. It delivers a complete documentation site UI out of the box: responsive navbar, footer, collapsible sidebar, table of contents, breadcrumbs, version banners, doc and blog layouts, MDX page rendering, syntax-highlighted code blocks, and more. The theme is built on [Infima](https://infima.dev/), a purpose-built CSS framework for documentation, and exposes dozens of CSS custom properties so you can reskin the site without touching any component source code.
+
+## Installation
+
+<Note>
+  If you are using `@docusaurus/preset-classic`, `theme-classic` is already installed and configured. You do not need to install it separately.
+</Note>
+
+```bash
+npm install --save @docusaurus/theme-classic
+```
+
+Register the theme explicitly only if you are **not** using the preset:
+
+```js title="docusaurus.config.js"
+export default {
+  themes: ['@docusaurus/theme-classic'],
+};
+```
+
+## Configuration
+
+`theme-classic` accepts a single plugin-level option:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `customCss` | `string \| string[]` | `[]` | One or more CSS files to import globally as client modules. Paths are relative to the site directory. |
+
+<Tabs>
+  <Tab title="Via preset (recommended)">
+    ```js title="docusaurus.config.js"
+    export default {
+      presets: [
+        [
+          'classic',
+          {
+            theme: {
+              customCss: './src/css/custom.css',
+            },
+          },
+        ],
+      ],
+    };
+    ```
+  </Tab>
+  <Tab title="Via plugin option">
+    ```js title="docusaurus.config.js"
+    export default {
+      themes: [
+        [
+          '@docusaurus/theme-classic',
+          {
+            customCss: ['./src/css/custom.css', './src/css/extra.css'],
+          },
+        ],
+      ],
+    };
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  The vast majority of visual configuration — navbar, footer, color mode, Prism syntax highlighting — lives in `themeConfig`, not in the plugin options above. See the [Theme Configuration](/api/themes/theme-configuration) reference for details.
+</Note>
+
+## Infima CSS integration
+
+`theme-classic` imports Infima's default stylesheet automatically. Infima is a component-based CSS framework that uses CSS custom properties extensively, making it straightforward to restyle the entire site by overriding a small set of variables in your custom CSS file.
+
+The most important Infima variables to override are the primary color shades. Infima expects you to provide the full 0–9 scale:
+
+```css title="src/css/custom.css"
+:root {
+  --ifm-color-primary: #2e8555;
+  --ifm-color-primary-dark: #29784c;
+  --ifm-color-primary-darker: #277148;
+  --ifm-color-primary-darkest: #205d3b;
+  --ifm-color-primary-light: #33925d;
+  --ifm-color-primary-lighter: #359962;
+  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-code-font-size: 95%;
+}
+```
+
+<Tip>
+  Use the [Infima color generator](https://infima.dev/docs/utilities/colors) to produce the full primary color scale from a single hex value.
+</Tip>
+
+### Dark mode CSS variables
+
+Override variables inside the `[data-theme='dark']` selector to apply dark-mode-specific values:
+
+```css title="src/css/custom.css"
+[data-theme='dark'] {
+  --ifm-color-primary: #25c2a0;
+  --ifm-color-primary-dark: #21af90;
+  --ifm-color-primary-darker: #1fa588;
+  --ifm-color-primary-darkest: #1a8870;
+  --ifm-color-primary-light: #29d5b0;
+  --ifm-color-primary-lighter: #32d8b4;
+  --ifm-color-primary-lightest: #4fddbf;
+}
+```
+
+### Commonly used CSS variables
+
+| Variable | Purpose |
+|---|---|
+| `--ifm-color-primary` | Main accent color (links, buttons, active states) |
+| `--ifm-font-family-base` | Body font stack |
+| `--ifm-font-family-monospace` | Code font stack |
+| `--ifm-font-size-base` | Base font size |
+| `--ifm-line-height-base` | Base line height |
+| `--ifm-navbar-height` | Height of the top navbar |
+| `--ifm-sidebar-width` | Width of the doc sidebar |
+| `--ifm-toc-border-color` | Color of the table of contents border |
+| `--ifm-code-font-size` | Font size inside inline and block code |
+| `--docusaurus-highlighted-code-line-bg` | Background for highlighted code lines |
+
+## Swizzlable components
+
+Every component in the table below can be replaced or wrapped with your own version using `npx docusaurus swizzle`. Components marked **safe** have a stable interface; **unsafe** components may change between minor releases.
+
+```bash
+# List all swizzlable components and their safety status
+npx docusaurus swizzle @docusaurus/theme-classic --list
+```
+
+<AccordionGroup>
+  <Accordion title="Layout and navigation">
+
+    | Component | Description |
+    |---|---|
+    | `Layout` | Root page wrapper; includes `<html>`, `<head>`, and `<body>` structure |
+    | `Navbar` | Top navigation bar |
+    | `NavbarItem` | Individual item inside the navbar |
+    | `Footer` | Site-wide footer |
+    | `SkipToContent` | Accessibility skip link at the top of the page |
+    | `BackToTopButton` | Floating button that scrolls back to the top |
+    | `AnnouncementBar` | Dismissible banner shown above the navbar |
+    | `ThemeProvider` | Provides color mode context to the whole tree |
+    | `Logo` | Site logo used in navbar and footer |
+    | `ColorModeToggle` | Light/dark mode switch |
+
+  </Accordion>
+  <Accordion title="Docs components">
+
+    | Component | Description |
+    |---|---|
+    | `DocItem` | Root layout for an individual documentation page |
+    | `DocRoot` | Container that hosts the sidebar and doc content area |
+    | `DocsRoot` | Top-level docs wrapper (handles versioning context) |
+    | `DocSidebar` | The collapsible sidebar used on doc pages |
+    | `DocSidebarItem` | A single item (link, category, or HTML) inside the sidebar |
+    | `DocSidebarItems` | Renders a list of sidebar items |
+    | `DocBreadcrumbs` | Breadcrumb navigation at the top of a doc page |
+    | `DocPaginator` | Previous / next navigation at the bottom of a doc page |
+    | `DocVersionBadge` | Badge that shows the active docs version |
+    | `DocVersionBanner` | Banner warning when browsing a non-latest version |
+    | `DocVersionRoot` | Provides version context to doc pages |
+    | `DocCard` | Card used in generated category index pages |
+    | `DocCardList` | Grid of `DocCard` components |
+    | `DocCategoryGeneratedIndexPage` | Auto-generated landing page for a sidebar category |
+    | `DocTagsListPage` | Page listing all doc tags |
+    | `DocTagDocListPage` | Page listing docs that share a given tag |
+    | `EditThisPage` | "Edit this page" link pointing to the source file |
+    | `EditMetaRow` | Row combining "Edit this page" and "Last updated" |
+    | `LastUpdated` | Displays the last-updated timestamp |
+
+  </Accordion>
+  <Accordion title="Blog components">
+
+    | Component | Description |
+    |---|---|
+    | `BlogLayout` | Root layout for all blog pages |
+    | `BlogListPage` | Page listing recent blog posts |
+    | `BlogListPaginator` | Pagination controls on blog list pages |
+    | `BlogPostItem` | Summary card for a single post on the list page |
+    | `BlogPostItems` | Renders a list of `BlogPostItem` components |
+    | `BlogPostPage` | Full layout for reading a single blog post |
+    | `BlogPostPaginator` | Previous / next navigation within blog posts |
+    | `BlogSidebar` | Sidebar shown on blog pages |
+    | `BlogTagsListPage` | Page listing all blog tags |
+    | `BlogTagsPostsPage` | Page listing posts for a specific tag |
+    | `BlogArchivePage` | Chronological archive of all blog posts |
+
+  </Accordion>
+  <Accordion title="Content and markdown components">
+
+    | Component | Description |
+    |---|---|
+    | `CodeBlock` | Syntax-highlighted fenced code block |
+    | `CodeInline` | Inline code span |
+    | `MDXComponents` | Maps HTML element names to React components for MDX |
+    | `MDXContent` | Wraps MDX page content |
+    | `MDXPage` | Full page layout for standalone MDX pages |
+    | `Admonition` | Renders `:::note`, `:::tip`, `:::warning`, etc. |
+    | `Details` | Expandable `<details>` / `<summary>` element |
+    | `Heading` | Section heading with anchor link |
+    | `Tabs` | Tabbed content container |
+    | `TabItem` | Individual tab pane inside `Tabs` |
+    | `ThemedImage` | Image that swaps src based on the active color mode |
+    | `Mermaid` | Placeholder component (replaced by `theme-mermaid`) |
+
+  </Accordion>
+  <Accordion title="Table of contents components">
+
+    | Component | Description |
+    |---|---|
+    | `TOC` | Fixed table of contents shown on the right side of doc pages |
+    | `TOCCollapsible` | Collapsible TOC used on mobile |
+    | `TOCInline` | Inline TOC that can be embedded anywhere in content |
+    | `TOCItems` | Renders the list of heading links inside any TOC variant |
+
+  </Accordion>
+  <Accordion title="Tags, icons, and metadata">
+
+    | Component | Description |
+    |---|---|
+    | `Tag` | Pill-shaped tag component |
+    | `TagsListByLetter` | Alphabetical tag listing |
+    | `TagsListInline` | Compact inline tag list |
+    | `Icon` | Wrapper for SVG icon sprites bundled with the theme |
+    | `SearchBar` | Search bar slot (populated by a search theme) |
+    | `SearchMetadata` | Injects Algolia meta tags when search theme is active |
+    | `SiteMetadata` | Inserts global `<meta>` and `<link>` tags |
+    | `ContentVisibility` | Controls deferred rendering for off-screen content |
+    | `NotFound` | 404 error page |
+    | `ErrorPageContent` | Content rendered inside the error boundary |
+    | `PaginatorNavLink` | Single previous/next link used by paginators |
+
+  </Accordion>
+</AccordionGroup>
+
+## RTL support
+
+`theme-classic` ships RTL-transformed versions of the Infima stylesheet and uses `postcss-rtlcss` to transform your custom CSS at build time whenever the active locale is configured with `direction: 'rtl'`. No extra setup is needed beyond locale configuration.

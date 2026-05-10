@@ -1,0 +1,273 @@
+---
+title: "Set Up a Docusaurus Blog with Authors and RSS"
+description: "Configure the Docusaurus blog plugin, create posts with date-based file naming, manage authors and tags, enable RSS and Atom feeds, and run a blog-only site."
+---
+
+The `@docusaurus/plugin-content-blog` plugin gives you a full-featured blog with author profiles, tags, reading time estimates, RSS and Atom feeds, and paginated post lists — all powered by Markdown files. The classic preset includes it by default.
+
+## Initial setup
+
+Create a `blog/` directory at your project root, then add a navbar link in `docusaurus.config.js`:
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    navbar: {
+      items: [
+        { to: 'blog', label: 'Blog', position: 'left' },
+      ],
+    },
+  },
+};
+```
+
+## Creating blog posts
+
+Add a Markdown file to the `blog/` directory. Docusaurus extracts the publication date from the filename using a `YYYY-MM-DD` prefix:
+
+```md title="blog/2024-03-15-welcome.md"
+---
+title: Welcome to My Blog
+description: This is my first post on Docusaurus.
+slug: welcome
+authors:
+  - name: Jane Smith
+    title: Documentation Lead
+    url: https://github.com/janesmith
+    image_url: https://github.com/janesmith.png
+    socials:
+      github: janesmith
+tags: [welcome, docusaurus]
+image: https://example.com/img/preview.png
+---
+
+Welcome to this blog, built with Docusaurus.
+
+<!-- truncate -->
+
+This is the rest of the post body, hidden from the blog list summary.
+```
+
+The `<!-- truncate -->` marker separates the summary shown on the list page from the full post content. For `.mdx` files, use `{/* truncate */}` instead.
+
+### File naming patterns
+
+Docusaurus supports several date extraction patterns:
+
+| Pattern | Example |
+| --- | --- |
+| Single file | `2024-03-15-my-post.md` |
+| MDX file | `2024-03-15-my-post.mdx` |
+| Folder with `index.md` | `2024-03-15-my-post/index.md` |
+| Nested folders | `2024/03/15/my-post.md` |
+| Date in middle of path | `category/2024/03-15-my-post.md` |
+
+<Tip>
+  Use a folder per post when you want to co-locate images alongside the Markdown file:
+  ```
+  blog/2024-03-15-my-post/
+  ├── index.md
+  └── screenshot.png
+  ```
+</Tip>
+
+## Authors configuration
+
+### Inline authors
+
+Declare authors directly in the post's frontmatter — useful for one-off or guest authors:
+
+```md title="blog/my-post.md"
+---
+authors:
+  - name: Joel Marcey
+    title: Co-creator of Docusaurus 1
+    url: https://github.com/JoelMarcey
+    image_url: https://github.com/JoelMarcey.png
+    socials:
+      x: joelmarcey
+      github: JoelMarcey
+  - name: Sébastien Lorber
+    title: Docusaurus maintainer
+    url: https://sebastienlorber.com
+    image_url: https://github.com/slorber.png
+---
+```
+
+### Global authors file
+
+For recurring authors, maintain a central `blog/authors.yml` file and reference authors by key:
+
+```yaml title="blog/authors.yml"
+jmarcey:
+  name: Joel Marcey
+  title: Co-creator of Docusaurus 1
+  url: https://github.com/JoelMarcey
+  image_url: https://github.com/JoelMarcey.png
+  email: jimarcey@gmail.com
+  socials:
+    x: joelmarcey
+    github: JoelMarcey
+
+slorber:
+  name: Sébastien Lorber
+  title: Docusaurus maintainer
+  url: https://sebastienlorber.com
+  image_url: https://github.com/slorber.png
+  socials:
+    x: sebastienlorber
+    github: slorber
+    email: seb@example.com
+```
+
+Then reference them by key in your frontmatter:
+
+<Tabs>
+  <Tab title="Single author">
+    ```md title="blog/my-post.md"
+    ---
+    authors: jmarcey
+    ---
+    ```
+  </Tab>
+  <Tab title="Multiple authors">
+    ```md title="blog/my-post.md"
+    ---
+    authors: [jmarcey, slorber]
+    ---
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  RSS feed generation requires the author's `email` to be set. Without it, the author will not appear in the feed entries.
+</Note>
+
+### Author pages
+
+Enable dedicated author pages by adding `page: true` to the global authors configuration:
+
+```yaml title="blog/authors.yml"
+slorber:
+  name: Sébastien Lorber
+  page: true  # enables /blog/authors/slorber
+```
+
+The blog plugin generates a page for each author listing all their posts, and an index at `/blog/authors` listing all authors.
+
+## Tags
+
+Tags create another dimension of categorization. Define them inline or reference predefined tags:
+
+```md title="blog/my-post.md"
+---
+tags:
+  - Releases
+  - docusaurus
+---
+```
+
+```yaml title="blog/tags.yml"
+docusaurus:
+  label: 'Docusaurus'
+  permalink: '/docusaurus'
+  description: 'Blog posts related to the Docusaurus framework'
+```
+
+## RSS feed
+
+Docusaurus generates RSS and Atom feeds by default. Configure them in the blog plugin options:
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        blog: {
+          feedOptions: {
+            type: 'all', // 'rss' | 'atom' | 'json' | 'all'
+            copyright: `Copyright © ${new Date().getFullYear()} My Company`,
+            createFeedItems: async (params) => {
+              const {blogPosts, defaultCreateFeedItems, ...rest} = params;
+              return defaultCreateFeedItems({
+                // keep only the 10 most recent posts in the feed
+                blogPosts: blogPosts.filter((item, index) => index < 10),
+                ...rest,
+              });
+            },
+          },
+        },
+      },
+    ],
+  ],
+};
+```
+
+Feed URLs follow this pattern:
+
+<Tabs>
+  <Tab title="RSS">
+    ```text
+    https://example.com/blog/rss.xml
+    ```
+  </Tab>
+  <Tab title="Atom">
+    ```text
+    https://example.com/blog/atom.xml
+    ```
+  </Tab>
+  <Tab title="JSON">
+    ```text
+    https://example.com/blog/feed.json
+    ```
+  </Tab>
+</Tabs>
+
+## Blog-only mode
+
+Run a site that is exclusively a blog by setting `routeBasePath: '/'`:
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        docs: false, // disable the docs plugin
+        blog: {
+          routeBasePath: '/', // serve blog at the site root
+        },
+      },
+    ],
+  ],
+};
+```
+
+<Warning>
+  Delete `src/pages/index.js` when enabling blog-only mode. Keeping it creates a route conflict at `/` that Docusaurus will warn about.
+</Warning>
+
+## List page and sidebar
+
+Configure the blog list page and sidebar behavior through the plugin options:
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        blog: {
+          blogTitle: 'My Engineering Blog',
+          blogDescription: 'Updates from our team',
+          postsPerPage: 10,           // or 'ALL' to disable pagination
+          blogSidebarTitle: 'All posts',
+          blogSidebarCount: 'ALL',    // show all posts in sidebar; 0 to hide
+          showReadingTime: true,
+        },
+      },
+    ],
+  ],
+};
+```

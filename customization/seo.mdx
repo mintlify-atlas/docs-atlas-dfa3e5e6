@@ -1,0 +1,260 @@
+---
+title: "Optimize Your Docusaurus Site for Search Engines"
+description: "Configure SEO in Docusaurus using frontmatter, Open Graph tags, sitemap plugin, robots.txt, canonical URLs, and structured HTML metadata."
+---
+
+Docusaurus generates static HTML for every URL in your site, which gives search engine crawlers a clean, indexable page without any client-side rendering overhead. On top of that foundation, Docusaurus provides several layers of SEO control — from per-page frontmatter to site-wide metadata, sitemaps, and structured data.
+
+## Page-level metadata via frontmatter
+
+Every Markdown and MDX page can define its own `title`, `description`, `keywords`, and `image` fields in frontmatter. Docusaurus applies these to both the HTML `<meta>` tags and the corresponding Open Graph (`og:`) properties automatically:
+
+```md title="docs/getting-started.md"
+---
+title: Getting started with Docusaurus
+description: A step-by-step guide to creating your first Docusaurus documentation site.
+keywords: [docusaurus, documentation, static site generator]
+image: /img/getting-started-preview.png
+---
+```
+
+<Tip>
+Use frontmatter for `description` and `keywords` instead of a manual `<head>` block. Docusaurus writes both `<meta name="description">` and `<meta property="og:description">` from a single frontmatter value, saving you from declaring them twice.
+</Tip>
+
+<Info>
+The `title`, `description`, `keywords`, and `image` frontmatter fields are supported by all three official content plugins: docs, blog, and pages. Check each plugin's API reference for any additional plugin-specific frontmatter.
+</Info>
+
+## Global site metadata
+
+Metadata that should appear on every page belongs in `docusaurus.config.js`. Use `themeConfig.metadata` for `<meta>` tags and `headTags` for arbitrary `<head>` elements:
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    metadata: [
+      {name: 'keywords', content: 'docusaurus, documentation, react'},
+      {name: 'twitter:card', content: 'summary_large_image'},
+    ],
+  },
+  headTags: [
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preconnect',
+        href: 'https://fonts.googleapis.com',
+      },
+    },
+  ],
+};
+```
+
+## Custom `<head>` tags per page
+
+For per-page head customization in MDX files, embed a `<head>` block directly in your Markdown:
+
+```mdx title="docs/my-page.mdx"
+# My page
+
+<head>
+  <meta name="keywords" content="cooking, blog" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://example.com" />
+</head>
+
+Page content begins here.
+```
+
+For React pages (`src/pages/*.jsx`), use the `<Head>` component from `@docusaurus/Head`:
+
+```jsx title="src/pages/my-page.jsx"
+import React from 'react';
+import Layout from '@theme/Layout';
+import Head from '@docusaurus/Head';
+
+export default function MyPage() {
+  return (
+    <Layout title="My page" description="A custom React page">
+      <Head>
+        <meta property="og:image" content="/img/preview.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Head>
+      {/* page content */}
+    </Layout>
+  );
+}
+```
+
+## Open Graph and Twitter card support
+
+Open Graph and Twitter Card tags control how your pages are displayed when shared on social media. Set them through frontmatter or the `<head>` block.
+
+<Tabs>
+  <Tab title="Via frontmatter (recommended)">
+    ```md
+    ---
+    title: My guide title
+    description: A concise description for the social card.
+    image: /img/my-page-preview.png
+    ---
+    ```
+
+    Docusaurus maps `image` to `og:image` and `twitter:image` automatically.
+  </Tab>
+  <Tab title="Via head tags">
+    ```mdx
+    <head>
+      <meta property="og:title" content="My guide title" />
+      <meta property="og:description" content="A concise description." />
+      <meta property="og:image" content="/img/my-page-preview.png" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:image" content="/img/my-page-preview.png" />
+    </head>
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+Twitter card tags can also be set globally in `themeConfig.metadata` so every page in your site gets a default card type without per-page configuration.
+</Note>
+
+## Sitemap plugin
+
+`@docusaurus/plugin-sitemap` automatically generates `sitemap.xml` after a production build. The file is available at `https://example.com/[baseUrl]/sitemap.xml` and helps search engine crawlers discover all of your pages.
+
+The plugin is included in `@docusaurus/preset-classic` and enabled by default. Configure it through the preset:
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        sitemap: {
+          changefreq: 'weekly',
+          priority: 0.5,
+          ignorePatterns: ['/tags/**'],
+          filename: 'sitemap.xml',
+        },
+      },
+    ],
+  ],
+};
+```
+
+<Tip>
+The sitemap plugin automatically excludes pages that contain a `<meta name="robots" content="noindex">` directive. You do not need to manage exclusions manually.
+</Tip>
+
+If you are not using the preset, install and register the plugin directly:
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install --save @docusaurus/plugin-sitemap
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add @docusaurus/plugin-sitemap
+    ```
+  </Tab>
+</Tabs>
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: [
+    [
+      '@docusaurus/plugin-sitemap',
+      {
+        changefreq: 'weekly',
+      },
+    ],
+  ],
+};
+```
+
+## robots.txt
+
+Place a `robots.txt` file in your `static/` directory. Docusaurus copies everything in `static/` to the build output root, so the file will be served at `/robots.txt`.
+
+To allow all crawlers to index all pages:
+
+```text title="static/robots.txt"
+User-agent: *
+Disallow:
+```
+
+To block all crawlers entirely (useful for staging environments):
+
+```text title="static/robots.txt"
+User-agent: *
+Disallow: /
+```
+
+<Warning>
+`robots.txt` instructs crawlers which pages to crawl, but does **not** prevent pages from being indexed if they are already linked from elsewhere. To fully prevent indexing of your entire site, set `noIndex: true` in `docusaurus.config.js`. To prevent indexing of a single page, add `<meta name="robots" content="noindex">` to that page's `<head>`.
+</Warning>
+
+## Canonical URLs
+
+Docusaurus automatically adds a `<link rel="canonical">` tag to each page pointing to its own URL. This prevents duplicate content penalties when the same content is accessible at multiple URLs (for example, with and without a trailing slash, or across different domains).
+
+You can override the canonical URL for a specific page using frontmatter:
+
+```md
+---
+title: My page
+custom_canonical: https://example.com/original-page
+---
+```
+
+For i18n sites, Docusaurus also generates `<link rel="alternate" hreflang="...">` tags so search engines serve the correct language version to users in each locale.
+
+## Structured data
+
+Search engines use structured data (JSON-LD) to generate rich results in SERPs. Inject it via `headTags` in your config for global structured data, or via the `<head>` block / `<Head>` component for page-level data:
+
+```js title="docusaurus.config.js"
+export default {
+  headTags: [
+    {
+      tagName: 'script',
+      attributes: {type: 'application/ld+json'},
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org/',
+        '@type': 'Organization',
+        name: 'My Company',
+        url: 'https://example.com',
+        logo: 'https://example.com/img/logo.svg',
+      }),
+    },
+  ],
+};
+```
+
+Docusaurus blog pages automatically output rich search results based on post metadata (publish date, authors, and featured image) without any additional configuration.
+
+## SEO checklist
+
+<AccordionGroup>
+  <Accordion title="Every page has a unique title and description">
+    Set `title` and `description` in frontmatter for each Markdown page. For React pages, pass them as props to the `<Layout>` component.
+  </Accordion>
+  <Accordion title="Social sharing images are configured">
+    Set `image` in frontmatter or add `og:image` / `twitter:image` meta tags. Use an image at least 1200×630 pixels for best results on Twitter and LinkedIn.
+  </Accordion>
+  <Accordion title="Sitemap is generated">
+    Confirm `sitemap.xml` appears in your production build output and submit it to Google Search Console.
+  </Accordion>
+  <Accordion title="robots.txt is present">
+    Place a `robots.txt` in `static/` appropriate to your environment (allow for production, restrict for staging).
+  </Accordion>
+  <Accordion title="noindex pages are excluded from the sitemap">
+    Pages with `<meta name="robots" content="noindex">` are automatically excluded from the generated sitemap.
+  </Accordion>
+  <Accordion title="URLs are human-readable">
+    Docusaurus uses file names as URL slugs by default. Override with the `slug` frontmatter field when you need a different URL.
+  </Accordion>
+</AccordionGroup>

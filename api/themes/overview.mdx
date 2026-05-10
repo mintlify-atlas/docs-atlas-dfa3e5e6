@@ -1,0 +1,110 @@
+---
+title: "Docusaurus Theme Overview and Official Themes Guide"
+description: "Overview of the Docusaurus theming system, official themes, the component override system, and how to choose and configure a theme for your site."
+---
+
+Docusaurus themes control the visual presentation and user interface of your documentation site. Unlike plugins, which add data-processing capabilities and content sources, themes contribute React components and global CSS that determine what visitors actually see and interact with. Every Docusaurus site needs at least one main theme to render its pages; enhancement themes layer on top to add features such as search and interactive code playgrounds.
+
+## Themes vs. plugins
+
+The distinction between themes and plugins in Docusaurus is subtle but important. Both are packages that hook into the Docusaurus lifecycle, but they serve different roles:
+
+| Aspect | Plugins | Themes |
+|---|---|---|
+| Primary purpose | Load and transform content | Provide UI components and styles |
+| Contributes routes | Yes (via `addRoute`) | Rarely |
+| Contributes components | No | Yes (via theme path) |
+| Example | `plugin-content-docs` | `theme-classic` |
+
+A theme package exposes a **theme path** — a directory of React components that Docusaurus resolves when it renders pages. When a plugin produces a page (for example, a doc page), it declares which theme component should render that page, and the active theme supplies that component.
+
+## The component override (swizzling) system
+
+Docusaurus allows you to replace or wrap any theme component with your own version — a process called **swizzling**. This gives you fine-grained control over every element of the UI without forking the entire theme.
+
+<Tabs>
+  <Tab title="Eject (replace)">
+    Ejecting copies the original component source into your site's `src/theme/` directory, where you can modify it freely.
+
+    ```bash
+    npx docusaurus swizzle @docusaurus/theme-classic Navbar --eject
+    ```
+  </Tab>
+  <Tab title="Wrap">
+    Wrapping creates a thin component in `src/theme/` that imports and renders the original, letting you add behavior above or below it without touching the internals.
+
+    ```bash
+    npx docusaurus swizzle @docusaurus/theme-classic Navbar --wrap
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  Some components are marked **unsafe** for swizzling because their internal API is subject to change between releases. Ejecting an unsafe component means you take on the responsibility of keeping it up to date with upstream changes.
+</Warning>
+
+<Tip>
+  Prefer wrapping over ejecting whenever possible. Wrapped components continue to receive upstream bug fixes and feature improvements automatically.
+</Tip>
+
+After swizzling, your local `src/theme/ComponentName/index.js` takes precedence over the package's version. Docusaurus resolves theme components using an alias chain: your site overrides → theme package → fallback defaults.
+
+## Official themes
+
+Docusaurus ships several official themes, split into main themes (which provide a complete UI) and enhancement themes (which augment an existing main theme).
+
+### Main themes
+
+<CardGroup cols={1}>
+  <Card title="@docusaurus/theme-classic" icon="palette">
+    The production-ready default theme used by most Docusaurus sites. Provides a full UI including navbar, footer, sidebar, table of contents, doc layout, blog layout, search bar slot, and all standard page types. Built on the [Infima](https://infima.dev/) CSS framework and fully customizable via CSS variables. Included automatically when you use `@docusaurus/preset-classic`.
+  </Card>
+</CardGroup>
+
+<Note>
+  Additional main themes are planned for the future. The goal is for all main themes to share the same features, configuration API, and user experience, differing only in visual design and styling framework. As of now, only `theme-classic` is production-ready.
+</Note>
+
+### Enhancement themes
+
+Enhancement themes add specific capabilities on top of any main theme. They do not provide a complete UI on their own.
+
+<CardGroup cols={1}>
+  <Card title="@docusaurus/theme-live-codeblock" icon="code">
+    Powers interactive, editable code blocks in your MDX content using [react-live](https://commerce.nearform.com/open-source/react-live/). Add `live` to any code fence to make it executable in the browser. Configure the playground position via `themeConfig.liveCodeBlock.playgroundPosition`.
+  </Card>
+  <Card title="@docusaurus/theme-search-algolia" icon="magnifying-glass">
+    Integrates [Algolia DocSearch](https://docsearch.algolia.com/) into your site's navbar. Provides a `SearchBar` component and a dedicated search results page at `/search`. Requires Algolia credentials configured in `themeConfig.algolia`.
+  </Card>
+  <Card title="@docusaurus/theme-mermaid" icon="diagram-project">
+    Renders [Mermaid](https://mermaid.js.org/) diagrams defined in fenced code blocks with the `mermaid` language tag. Requires enabling the Remark plugin via `markdown.mermaid: true` in `docusaurus.config.js`.
+  </Card>
+</CardGroup>
+
+## Installation and usage
+
+Most Docusaurus users install themes through the `@docusaurus/preset-classic` preset, which bundles `theme-classic` and `theme-search-algolia` together. If you need an enhancement theme separately, install it as a package and register it under the `themes` key in your config.
+
+```js title="docusaurus.config.js"
+export default {
+  themes: [
+    '@docusaurus/theme-live-codeblock',
+    '@docusaurus/theme-mermaid',
+  ],
+  // preset-classic already includes theme-classic and theme-search-algolia
+  presets: [
+    [
+      'classic',
+      {
+        theme: {
+          customCss: './src/css/custom.css',
+        },
+      },
+    ],
+  ],
+};
+```
+
+## Theme configuration
+
+All theme visual options — color mode, navbar, footer, code highlighting, and table of contents — are set inside the `themeConfig` object in `docusaurus.config.js`. See the [Theme Configuration](/api/themes/theme-configuration) reference for a complete field listing.

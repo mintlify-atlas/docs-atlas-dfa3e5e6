@@ -1,0 +1,848 @@
+---
+title: "Plugin Lifecycle APIs for Docusaurus Plugins"
+description: "Complete reference for Docusaurus plugin lifecycle methods including loadContent, contentLoaded, postBuild, injectHtmlTags, and webpack configuration hooks."
+---
+
+Docusaurus plugins expose a set of lifecycle methods that are called at specific points during the build and development server processes. Each plugin is a function that receives a `context` and `options` argument and returns an object implementing whichever lifecycle methods it needs. Methods are called in parallel across plugins where possible, so avoid assuming a particular ordering between plugins unless Docusaurus documents one explicitly.
+
+## Plugin module structure
+
+A plugin module exports a constructor function as its default export. The function receives the site-wide `LoadContext` and any plugin-specific `options`, then returns a plain object containing lifecycle method implementations.
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import type {LoadContext, Plugin} from '@docusaurus/types';
+
+export default function myPlugin(
+  context: LoadContext,
+  options: {path: string},
+): Plugin {
+  return {
+    name: 'my-plugin',
+    // lifecycle methods go here
+  };
+}
+```
+
+```javascript my-plugin/src/index.js
+export default function myPlugin(context, options) {
+  return {
+    name: 'my-plugin',
+    // lifecycle methods go here
+  };
+}
+```
+
+</CodeGroup>
+
+### Plugin context (`LoadContext`)
+
+The `context` object is identical for every plugin on a given site. It exposes site-level configuration and paths that plugins frequently need.
+
+```typescript
+type LoadContext = {
+  /** Absolute path to the site root directory. */
+  siteDir: string;
+  /** Absolute path where generated files are written. */
+  generatedFilesDir: string;
+  /** Absolute path to the production output directory. */
+  outDir: string;
+  /** Resolved docusaurus.config.js contents. */
+  siteConfig: DocusaurusConfig;
+  /** The config file path on disk. */
+  siteConfigPath: string;
+  /** Resolved base URL (includes locale prefix when applicable). */
+  baseUrl: string;
+  /** i18n context for the current build. */
+  i18n: I18n;
+  /** Pre-loaded code translations for the current locale. */
+  codeTranslations: CodeTranslations;
+  /** Current bundler details (Webpack or Rspack). */
+  currentBundler: CurrentBundler;
+};
+```
+
+<Note>
+The `i18n` object on `context` contains `currentLocale`, `defaultLocale`, `locales`, and per-locale configuration. Use it in `getPathsToWatch` or `loadContent` to load locale-specific data files.
+</Note>
+
+---
+
+## `loadContent()`
+
+`loadContent` is the first lifecycle hook called during a build. Use it to fetch data from external APIs, read from the filesystem, query a CMS, or perform any other async server-side work. Whatever value you return becomes the `content` argument passed to later lifecycle methods.
+
+```typescript
+loadContent?: () => Promise<Content> | Content;
+```
+
+**Return value:** Any serializable value, or a `Promise` that resolves to one. The type parameter `Content` flows through to `contentLoaded`, `injectHtmlTags`, `configureWebpack`, and the translation lifecycles.
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import type {LoadContext, Plugin} from '@docusaurus/types';
+import {readFile} from 'fs/promises';
+import path from 'path';
+
+type MyContent = {items: string[]};
+
+export default function myPlugin(
+  context: LoadContext,
+  options: {dataFile: string},
+): Plugin<MyContent> {
+  return {
+    name: 'my-plugin',
+
+    async loadContent(): Promise<MyContent> {
+      const dataPath = path.resolve(context.siteDir, options.dataFile);
+      const raw = await readFile(dataPath, 'utf8');
+      return {items: JSON.parse(raw)};
+    },
+  };
+}
+```
+
+```javascript my-plugin/src/index.js
+import {readFile} from 'fs/promises';
+import path from 'path';
+
+export default function myPlugin(context, options) {
+  return {
+    name: 'my-plugin',
+
+    async loadContent() {
+      const dataPath = path.resolve(context.siteDir, options.dataFile);
+      const raw = await readFile(dataPath, 'utf8');
+      return {items: JSON.parse(raw)};
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+---
+
+## `contentLoaded({content, actions})`
+
+`contentLoaded` is called after `loadContent` completes. It receives the value returned by `loadContent` and an `actions` object with three functions for registering routes and data with Docusaurus.
+
+```typescript
+contentLoaded?: (args: {
+  content: Content;
+  actions: PluginContentLoadedActions;
+}) => Promise<void> | void;
+```
+
+### `content`
+
+The value returned by `loadContent()`. If `loadContent` is not implemented, `content` is `undefined`.
+
+### `actions`
+
+```typescript
+type PluginContentLoadedActions = {
+  addRoute: (config: RouteConfig) => void;
+  createData: (name: string, data: string | object) => Promise<string>;
+  setGlobalData: (data: unknown) => void;
+};
+```
+
+#### `addRoute(config: RouteConfig)`
+
+Registers a page at the given URL path. The `component` field must be a path that the bundler can resolve with `require`.
+
+```typescript
+type RouteConfig = {
+  /** URL path with a leading slash. Trailing slash is normalized by config. */
+  path: string;
+  /** Bundler-resolvable path to the React component that renders this route. */
+  component: string;
+  /**
+   * Prop modules: each key maps a prop name to a JSON file path created
+   * with createData(). The data is loaded lazily on the client.
+   */
+  modules?: RouteModules;
+  /** Context data made available via useRouteContext(). */
+  context?: RouteModules;
+  /** Nested child routes for layout routes. */
+  routes?: RouteConfig[];
+  /** When true, only matches the exact path (no sub-paths). */
+  exact?: boolean;
+  /** When true, the trailing slash is significant. */
+  strict?: boolean;
+  /** Higher values are matched first. */
+  priority?: number;
+  /** Server-only metadata (e.g. lastmod for sitemap). */
+  metadata?: RouteMetadata;
+};
+```
+
+#### `createData(name: string, data: string | object): Promise<string>`
+
+Writes a static JSON (or string) file to the generated files directory and returns its absolute path. Pass the returned path as a value inside `modules` when calling `addRoute` to make the data available as a React prop on the client.
+
+<Warning>
+`createData` writes files to disk. Call it once per data file and reuse the returned path — do not call it inside a loop for the same data.
+</Warning>
+
+#### `setGlobalData(data: unknown): void`
+
+Registers plugin data that any page can access via the `useGlobalData()` and `usePluginData()` hooks from `@docusaurus/useGlobalData`.
+
+<Warning>
+Global data is embedded in every page's JavaScript bundle. Keep it small. Use `createData` + `addRoute` for data that is only needed on specific pages.
+</Warning>
+
+### Complete `contentLoaded` example
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import type {LoadContext, Plugin} from '@docusaurus/types';
+
+type Item = {id: string; title: string};
+type MyContent = {items: Item[]};
+
+export default function myPlugin(context: LoadContext): Plugin<MyContent> {
+  return {
+    name: 'my-plugin',
+
+    async loadContent(): Promise<MyContent> {
+      return {items: [{id: '1', title: 'Hello'}]};
+    },
+
+    async contentLoaded({content, actions}) {
+      const {createData, addRoute, setGlobalData} = actions;
+
+      // Write each item as a separate JSON data file
+      for (const item of content.items) {
+        const dataPath = await createData(
+          `item-${item.id}.json`,
+          JSON.stringify(item),
+        );
+
+        addRoute({
+          path: `/items/${item.id}`,
+          component: '@site/src/components/ItemPage.tsx',
+          modules: {item: dataPath},
+          exact: true,
+        });
+      }
+
+      // Also expose a summary to all pages
+      setGlobalData({itemCount: content.items.length});
+    },
+  };
+}
+```
+
+```javascript my-plugin/src/index.js
+export default function myPlugin(context) {
+  return {
+    name: 'my-plugin',
+
+    async loadContent() {
+      return {items: [{id: '1', title: 'Hello'}]};
+    },
+
+    async contentLoaded({content, actions}) {
+      const {createData, addRoute, setGlobalData} = actions;
+
+      for (const item of content.items) {
+        const dataPath = await createData(
+          `item-${item.id}.json`,
+          JSON.stringify(item),
+        );
+
+        addRoute({
+          path: `/items/${item.id}`,
+          component: '@site/src/components/ItemPage.js',
+          modules: {item: dataPath},
+          exact: true,
+        });
+      }
+
+      setGlobalData({itemCount: content.items.length});
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+---
+
+## `postBuild(props)`
+
+Called once after the production build completes. Use it to generate sitemaps, send notifications, post-process output files, or run any other cleanup tasks that require the full set of built routes.
+
+```typescript
+postBuild?: (
+  props: Props & {
+    content: Content;
+    head: {[location: string]: HelmetServerState};
+    routesBuildMetadata: {[location: string]: RouteBuildMetadata};
+  },
+) => Promise<void> | void;
+```
+
+The `props` argument extends `LoadContext` with additional build-time information:
+
+| Property | Type | Description |
+|---|---|---|
+| `siteDir` | `string` | Absolute path to the site root |
+| `outDir` | `string` | Absolute path to the production output directory |
+| `baseUrl` | `string` | Resolved base URL |
+| `siteConfig` | `DocusaurusConfig` | Resolved site configuration |
+| `routesPaths` | `string[]` | Every URL path that was rendered |
+| `routesBuildMetadata` | `object` | Per-route metadata (e.g. `noIndex`) |
+| `plugins` | `LoadedPlugin[]` | All loaded plugin instances |
+| `content` | `Content` | This plugin's loaded content |
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import type {LoadContext, Plugin} from '@docusaurus/types';
+import {writeFile} from 'fs/promises';
+import path from 'path';
+
+export default function myPlugin(context: LoadContext): Plugin {
+  return {
+    name: 'my-plugin',
+
+    async postBuild({outDir, routesPaths, siteConfig}) {
+      const manifest = {
+        baseUrl: siteConfig.baseUrl,
+        routes: routesPaths,
+        builtAt: new Date().toISOString(),
+      };
+      await writeFile(
+        path.join(outDir, 'build-manifest.json'),
+        JSON.stringify(manifest, null, 2),
+      );
+    },
+  };
+}
+```
+
+```javascript my-plugin/src/index.js
+import {writeFile} from 'fs/promises';
+import path from 'path';
+
+export default function myPlugin(context) {
+  return {
+    name: 'my-plugin',
+
+    async postBuild({outDir, routesPaths, siteConfig}) {
+      const manifest = {
+        baseUrl: siteConfig.baseUrl,
+        routes: routesPaths,
+        builtAt: new Date().toISOString(),
+      };
+      await writeFile(
+        path.join(outDir, 'build-manifest.json'),
+        JSON.stringify(manifest, null, 2),
+      );
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+<Note>
+`postBuild` is only called during `docusaurus build`. It does not run during `docusaurus start`.
+</Note>
+
+---
+
+## `injectHtmlTags({content})`
+
+Injects arbitrary HTML tags into every page's `<head>`, the opening `<body>`, or before the closing `</body>`. Tags can be raw HTML strings or structured `HtmlTagObject` values.
+
+```typescript
+injectHtmlTags?: (args: {content: Content}) => {
+  headTags?: HtmlTags;
+  preBodyTags?: HtmlTags;
+  postBodyTags?: HtmlTags;
+};
+
+type HtmlTags = string | HtmlTagObject | (string | HtmlTagObject)[];
+
+type HtmlTagObject = {
+  /** E.g. `'link'`, `'script'`, `'meta'` */
+  tagName: string;
+  /** E.g. `{ rel: 'preconnect', href: 'https://fonts.googleapis.com' }` */
+  attributes?: {[key: string]: string | boolean};
+  /** Inner HTML content of the tag. */
+  innerHTML?: string;
+  /** Set to true for custom HTML elements. */
+  customElement?: boolean;
+};
+```
+
+Tag placement rules:
+
+- **`headTags`** — inserted before the closing `</head>` tag, after script tags added by Docusaurus config.
+- **`preBodyTags`** — inserted immediately after the opening `<body>` tag.
+- **`postBodyTags`** — inserted immediately before the closing `</body>` tag.
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import type {LoadContext, Plugin} from '@docusaurus/types';
+
+type MyContent = {analyticsId: string};
+
+export default function myPlugin(context: LoadContext): Plugin<MyContent> {
+  return {
+    name: 'my-analytics-plugin',
+
+    async loadContent(): Promise<MyContent> {
+      return {analyticsId: process.env.ANALYTICS_ID ?? ''};
+    },
+
+    injectHtmlTags({content}) {
+      if (!content.analyticsId) return {};
+      return {
+        headTags: [
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preconnect',
+              href: 'https://www.googletagmanager.com',
+            },
+          },
+        ],
+        preBodyTags: [
+          {
+            tagName: 'script',
+            attributes: {
+              src: `https://www.googletagmanager.com/gtag/js?id=${content.analyticsId}`,
+              async: true,
+            },
+          },
+        ],
+        postBodyTags: [
+          `<noscript>Analytics requires JavaScript.</noscript>`,
+        ],
+      };
+    },
+  };
+}
+```
+
+```javascript my-plugin/src/index.js
+export default function myPlugin(context) {
+  return {
+    name: 'my-analytics-plugin',
+
+    async loadContent() {
+      return {analyticsId: process.env.ANALYTICS_ID ?? ''};
+    },
+
+    injectHtmlTags({content}) {
+      if (!content.analyticsId) return {};
+      return {
+        headTags: [
+          {
+            tagName: 'link',
+            attributes: {
+              rel: 'preconnect',
+              href: 'https://www.googletagmanager.com',
+            },
+          },
+        ],
+        preBodyTags: [
+          {
+            tagName: 'script',
+            attributes: {
+              src: `https://www.googletagmanager.com/gtag/js?id=${content.analyticsId}`,
+              async: true,
+            },
+          },
+        ],
+        postBodyTags: [`<noscript>Analytics requires JavaScript.</noscript>`],
+      };
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+---
+
+## `getPathsToWatch()`
+
+Returns an array of glob patterns or absolute file paths that the Docusaurus development server should watch. When any watched file changes, the plugin's `loadContent` lifecycle is re-executed and the site hot-reloads.
+
+```typescript
+getPathsToWatch?: () => string[];
+```
+
+<Tip>
+Only use `getPathsToWatch` for files consumed on the server side (i.e. in `loadContent`). Theme component files under the path returned by `getThemePath()` are watched automatically by the bundler's dev server.
+</Tip>
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import type {LoadContext, Plugin} from '@docusaurus/types';
+import path from 'path';
+
+export default function myPlugin(
+  context: LoadContext,
+  options: {contentDir: string},
+): Plugin {
+  return {
+    name: 'my-plugin',
+
+    getPathsToWatch(): string[] {
+      const contentPath = path.resolve(context.siteDir, options.contentDir);
+      return [`${contentPath}/**/*.{json,yaml,md}`];
+    },
+  };
+}
+```
+
+```javascript my-plugin/src/index.js
+import path from 'path';
+
+export default function myPlugin(context, options) {
+  return {
+    name: 'my-plugin',
+
+    getPathsToWatch() {
+      const contentPath = path.resolve(context.siteDir, options.contentDir);
+      return [`${contentPath}/**/*.{json,yaml,md}`];
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+---
+
+## `getThemePath()`
+
+Returns the path to the directory containing custom theme components. When a user runs `docusaurus swizzle`, Docusaurus calls `getThemePath()` on every theme to locate available components. Paths are resolved relative to the plugin's entry point file.
+
+```typescript
+getThemePath?: () => string;
+```
+
+<CodeGroup>
+
+```typescript my-theme/src/index.ts
+import type {LoadContext, Plugin} from '@docusaurus/types';
+
+export default function myTheme(context: LoadContext): Plugin {
+  return {
+    name: 'my-theme',
+
+    getThemePath(): string {
+      // Compiled JS output — used by webpack at runtime
+      return '../lib/theme';
+    },
+
+    getTypeScriptThemePath(): string {
+      // TypeScript source — used by swizzle for type-safe overrides
+      return '../src/theme';
+    },
+  };
+}
+```
+
+```javascript my-theme/src/index.js
+export default function myTheme(context) {
+  return {
+    name: 'my-theme',
+
+    getThemePath() {
+      return '../lib/theme';
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+<Note>
+If you provide TypeScript theme components, implement both `getThemePath()` (pointing to compiled JS) and `getTypeScriptThemePath()` (pointing to the `.tsx` source). This lets Docusaurus serve the compiled output while offering typed swizzle sources for users.
+</Note>
+
+---
+
+## `getClientModules()`
+
+Returns an array of module paths that are imported globally in the client bundle, before React renders the initial UI. Use this to inject global CSS, polyfills, or side-effect modules.
+
+```typescript
+getClientModules?: () => string[];
+```
+
+<CodeGroup>
+
+```typescript my-theme/src/index.ts
+import type {LoadContext, Plugin} from '@docusaurus/types';
+
+export default function myTheme(
+  context: LoadContext,
+  options: {customCss?: string; customJs?: string},
+): Plugin {
+  return {
+    name: 'my-theme',
+
+    getClientModules(): string[] {
+      return [options.customCss, options.customJs].filter(
+        (p): p is string => Boolean(p),
+      );
+    },
+  };
+}
+```
+
+```javascript my-theme/src/index.js
+export default function myTheme(context, options) {
+  return {
+    name: 'my-theme',
+
+    getClientModules() {
+      return [options.customCss, options.customJs].filter(Boolean);
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+---
+
+## `configureWebpack(config, isServer, utils, content)`
+
+Modifies the internal webpack (or Rspack) configuration. The return value is merged with the final config using [webpack-merge](https://github.com/survivejs/webpack-merge).
+
+```typescript
+configureWebpack?: (
+  config: WebpackConfiguration,
+  isServer: boolean,
+  utils: ConfigureWebpackUtils,
+  content: Content,
+) => ConfigureWebpackResult | void;
+
+type ConfigureWebpackUtils = {
+  currentBundler: CurrentBundler;
+  getStyleLoaders: (
+    isServer: boolean,
+    cssOptions: {[key: string]: unknown},
+  ) => RuleSetRule[];
+  getJSLoader: (options: {
+    isServer: boolean;
+    babelOptions?: string | {[key: string]: unknown};
+  }) => RuleSetRule;
+};
+
+type ConfigureWebpackResult = WebpackConfiguration & {
+  /** Override webpack-merge strategy per config key. */
+  mergeStrategy?: {[key: string]: CustomizeRuleString};
+};
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `config` | `WebpackConfiguration` | The current webpack config object for this build target. |
+| `isServer` | `boolean` | `true` during the server-side render build, `false` for the client build. |
+| `utils` | `ConfigureWebpackUtils` | Helper functions: `getStyleLoaders`, `getJSLoader`, `currentBundler`. |
+| `content` | `Content` | The content loaded by this plugin instance. |
+
+<Warning>
+`configureWebpack` is called twice per build: once for the server bundle and once for the client bundle. Use the `isServer` flag to apply rules selectively.
+</Warning>
+
+### Adding a custom loader
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import type {LoadContext, Plugin} from '@docusaurus/types';
+import type {Configuration} from 'webpack';
+
+export default function myPlugin(context: LoadContext): Plugin {
+  return {
+    name: 'my-plugin',
+
+    configureWebpack(config, isServer, utils): Configuration {
+      const {getJSLoader} = utils;
+      return {
+        module: {
+          rules: [
+            {
+              test: /\.mdx?$/,
+              use: [
+                getJSLoader({isServer}),
+                {loader: require.resolve('./my-mdx-loader')},
+              ],
+            },
+          ],
+        },
+      };
+    },
+  };
+}
+```
+
+```javascript my-plugin/src/index.js
+export default function myPlugin(context) {
+  return {
+    name: 'my-plugin',
+
+    configureWebpack(config, isServer, utils) {
+      const {getJSLoader} = utils;
+      return {
+        module: {
+          rules: [
+            {
+              test: /\.mdx?$/,
+              use: [
+                getJSLoader({isServer}),
+                {loader: require.resolve('./my-mdx-loader')},
+              ],
+            },
+          ],
+        },
+      };
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+### Controlling merge strategy
+
+By default webpack-merge appends rules. Use `mergeStrategy` to prepend or replace specific keys:
+
+```javascript
+configureWebpack(config, isServer, utils) {
+  return {
+    mergeStrategy: {'module.rules': 'prepend'},
+    module: {
+      rules: [myHighPriorityRule],
+    },
+  };
+},
+```
+
+### Configuring the dev server
+
+Return a `devServer` key to configure webpack's development server:
+
+```javascript
+configureWebpack(config, isServer, utils) {
+  return {
+    devServer: {
+      open: '/docs',
+      headers: {'X-Custom-Header': 'yes'},
+    },
+  };
+},
+```
+
+---
+
+## `configurePostCss(options)`
+
+Modifies the `postcssOptions` passed to `postcss-loader` during the client bundle build. Must return the (mutated or replaced) `postcssOptions` object.
+
+```typescript
+configurePostCss?: (options: PostCssOptions) => PostCssOptions;
+
+type PostCssOptions = {
+  plugins: unknown[];
+  [key: string]: unknown;
+};
+```
+
+<CodeGroup>
+
+```typescript my-plugin/src/index.ts
+import type {LoadContext, Plugin, PostCssOptions} from '@docusaurus/types';
+
+export default function myPlugin(context: LoadContext): Plugin {
+  return {
+    name: 'my-plugin',
+
+    configurePostCss(postcssOptions: PostCssOptions): PostCssOptions {
+      postcssOptions.plugins.push(require('postcss-import'));
+      postcssOptions.plugins.push(require('postcss-nesting'));
+      return postcssOptions;
+    },
+  };
+}
+```
+
+```javascript my-plugin/src/index.js
+export default function myPlugin(context) {
+  return {
+    name: 'my-plugin',
+
+    configurePostCss(postcssOptions) {
+      postcssOptions.plugins.push(require('postcss-import'));
+      postcssOptions.plugins.push(require('postcss-nesting'));
+      return postcssOptions;
+    },
+  };
+}
+```
+
+</CodeGroup>
+
+The default `postcssOptions` Docusaurus provides is:
+
+```javascript
+{
+  ident: 'postcss',
+  plugins: [require('autoprefixer')],
+}
+```
+
+<Tip>
+Always mutate and return the existing `postcssOptions` object rather than returning a fresh one. Returning a fresh object discards plugins added by other plugins or Docusaurus itself.
+</Tip>
+
+---
+
+## Lifecycle execution order
+
+<AccordionGroup>
+  <Accordion title="Build (docusaurus build)">
+    1. `validateOptions` / `validateThemeConfig` (static methods, before initialization)
+    2. Plugin constructors called in parallel
+    3. `getPathsToWatch` (not used during build, only dev server)
+    4. `loadContent` — all plugins called in parallel
+    5. `getTranslationFiles` + `translateContent` + `translateThemeConfig`
+    6. `contentLoaded` — all plugins called in parallel
+    7. `configureWebpack` — called per plugin, results merged
+    8. `configurePostCss` — called per plugin, results merged
+    9. `injectHtmlTags` — called per plugin, results concatenated
+    10. `postBuild` — called after all output files are written
+  </Accordion>
+  <Accordion title="Development server (docusaurus start)">
+    1. `validateOptions` / `validateThemeConfig`
+    2. Plugin constructors
+    3. `getPathsToWatch` — watched paths registered with the dev server
+    4. `loadContent` — re-executed on watched file changes
+    5. `getTranslationFiles` + `translateContent`
+    6. `contentLoaded`
+    7. `configureWebpack` (including `devServer` field)
+    8. `configurePostCss`
+    9. `injectHtmlTags`
+  </Accordion>
+</AccordionGroup>

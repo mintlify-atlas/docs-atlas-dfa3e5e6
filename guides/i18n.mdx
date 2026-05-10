@@ -1,0 +1,302 @@
+---
+title: "Internationalize Your Docusaurus Site with i18n"
+description: "Configure locales, run write-translations, translate Markdown and JSON files, integrate with Crowdin, and deploy a fully multilingual Docusaurus documentation site."
+---
+
+Docusaurus has built-in internationalization (i18n) support that lets you ship your documentation in multiple languages. The system is decoupled from any specific translation service — you work with files on the filesystem and choose how to manage translation workflows. This guide covers locale configuration, the translation workflow, Crowdin integration, and deployment.
+
+## i18n goals
+
+The Docusaurus i18n system is designed to be:
+
+- **Simple** — put translated files at the correct filesystem location.
+- **Flexible** — use Git, Crowdin, any FTP-based workflow, or SaaS translation tools.
+- **SEO-friendly** — automatically sets `<html lang="...">` and `hreflang` link tags.
+- **RTL-ready** — Arabic, Hebrew, and other right-to-left locales are supported.
+
+## Configuring locales
+
+Declare your default locale and all supported locales in `docusaurus.config.js`:
+
+```js title="docusaurus.config.js"
+export default {
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en', 'fr', 'fa'],
+    localeConfigs: {
+      en: {
+        htmlLang: 'en-GB',
+      },
+      fa: {
+        direction: 'rtl', // right-to-left locale
+      },
+    },
+  },
+};
+```
+
+Add a locale switcher dropdown to the navbar so users can change their language:
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    navbar: {
+      items: [
+        {
+          type: 'localeDropdown',
+          position: 'left',
+        },
+      ],
+    },
+  },
+};
+```
+
+<Tip>
+  Pass a `queryString` option to the `localeDropdown` item to append a query parameter when the user changes locale (e.g., `?persistLocale=true`). This is useful for server-side locale detection via cookies.
+</Tip>
+
+## Translation file types
+
+Docusaurus works with three kinds of translation files:
+
+<AccordionGroup>
+  <Accordion title="Markdown files">
+    Your doc and blog Markdown files are translated as whole files to preserve translation context. Copy your source files into the locale directory and translate them:
+
+    ```
+    website/i18n/fr/docusaurus-plugin-content-docs/current/
+    website/i18n/fr/docusaurus-plugin-content-blog/
+    website/i18n/fr/docusaurus-plugin-content-pages/
+    ```
+  </Accordion>
+  <Accordion title="JSON files (Chrome i18n format)">
+    JSON files translate React code, navbar labels, footer labels, and sidebar category labels. The format uses Chrome i18n:
+
+    ```json title="i18n/fr/code.json"
+    {
+      "Welcome to my website": {
+        "message": "Bienvenue sur mon site web"
+      },
+      "home.visitMyBlog": {
+        "message": "Vous pouvez aussi visiter mon {blog}",
+        "description": "The homepage message to ask the user to visit my blog"
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="Data files">
+    Some plugins read external data files that need localized copies. For example, the blog's `authors.yml` can be localized at:
+
+    ```
+    i18n/fr/docusaurus-plugin-content-blog/authors.yml
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Translation file structure
+
+All translation data lives under `website/i18n/[locale]/[pluginName]/`:
+
+```bash
+website/i18n/
+└── fr/
+    ├── code.json                              # React code labels
+    ├── docusaurus-plugin-content-blog/        # blog translations
+    │   └── 2024-01-01-hello.md
+    ├── docusaurus-plugin-content-docs/        # docs translations
+    │   ├── current/
+    │   │   ├── intro.md
+    │   │   └── tutorial/basics.md
+    │   └── current.json                       # sidebar labels
+    └── docusaurus-theme-classic/              # theme translations
+        ├── footer.json
+        └── navbar.json
+```
+
+## Translation workflow
+
+<Steps>
+  <Step title="Start the site in a locale">
+    Run the development server for a specific locale:
+
+    ```bash
+    npm run start -- --locale fr
+    ```
+
+    The site is accessible at `http://localhost:3000/fr/`. Most labels will be untranslated until you provide translation files.
+  </Step>
+  <Step title="Extract JSON translation keys">
+    Run the `write-translations` command to extract all translatable strings from React code, theme config, and plugin options into JSON files:
+
+    ```bash
+    npm run write-translations -- --locale fr
+    ```
+
+    This creates or updates JSON files under `i18n/fr/`. The command does static analysis of your source code — it cannot extract dynamically constructed strings.
+  </Step>
+  <Step title="Translate Markdown files">
+    Copy your source Markdown files to the locale directory and translate them in place:
+
+    ```bash
+    # Translate docs
+    mkdir -p i18n/fr/docusaurus-plugin-content-docs/current
+    cp -r docs/. i18n/fr/docusaurus-plugin-content-docs/current
+
+    # Translate blog posts
+    mkdir -p i18n/fr/docusaurus-plugin-content-blog
+    cp -r blog/. i18n/fr/docusaurus-plugin-content-blog
+
+    # Translate standalone pages
+    mkdir -p i18n/fr/docusaurus-plugin-content-pages
+    cp -r src/pages/. i18n/fr/docusaurus-plugin-content-pages
+    ```
+  </Step>
+  <Step title="Translate JSON files">
+    Edit the `message` values in each JSON file under `i18n/fr/`. The `description` fields provide context to translators and should not be changed.
+  </Step>
+</Steps>
+
+<Warning>
+  Use explicit heading IDs in your Markdown files when building localized sites. Translated headings produce different auto-generated IDs, which breaks anchor links. Add `{/* #my-stable-id */}` after headings to keep IDs stable across translations.
+</Warning>
+
+## Marking React strings for translation
+
+In your custom React code and pages, wrap visible strings with the translation API:
+
+<Tabs>
+  <Tab title="Before">
+    ```jsx title="src/pages/index.js"
+    import React from 'react';
+    import Layout from '@theme/Layout';
+
+    export default function Home() {
+      return (
+        <Layout>
+          <h1>Welcome to my website</h1>
+        </Layout>
+      );
+    }
+    ```
+  </Tab>
+  <Tab title="After">
+    ```jsx title="src/pages/index.js"
+    import React from 'react';
+    import Layout from '@theme/Layout';
+    import Translate, {translate} from '@docusaurus/Translate';
+
+    export default function Home() {
+      return (
+        <Layout>
+          <h1>
+            <Translate>Welcome to my website</Translate>
+          </h1>
+          <img
+            src="/img/home.png"
+            alt={translate({
+              message: 'Home icon',
+              description: 'The homepage icon alt message',
+            })}
+          />
+        </Layout>
+      );
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Crowdin integration
+
+Crowdin is a translation SaaS with a free plan for open-source projects. It is used by Facebook to translate Docusaurus, Jest, and ReasonML documentation.
+
+The recommended Crowdin workflow:
+
+<Steps>
+  <Step title="Set up the Crowdin project">
+    Create a Crowdin project and generate an API token. Install the Crowdin CLI:
+
+    ```bash
+    npm install -g @crowdin/cli
+    ```
+  </Step>
+  <Step title="Configure crowdin.yml">
+    Create a `crowdin.yml` at your project root. Map source files to their translated locations:
+
+    ```yaml title="crowdin.yml"
+    project_id: 'YOUR_PROJECT_ID'
+    api_token_env: CROWDIN_PERSONAL_TOKEN
+    base_path: '.'
+    base_url: 'https://api.crowdin.com'
+
+    files:
+      - source: /i18n/en/**
+        translation: /i18n/%locale%/**
+        ignore:
+          - '**/*.js'
+      - source: /docs/**
+        translation: /i18n/%locale%/docusaurus-plugin-content-docs/current/**
+      - source: /blog/**
+        translation: /i18n/%locale%/docusaurus-plugin-content-blog/**
+    ```
+  </Step>
+  <Step title="Upload sources">
+    ```bash
+    crowdin upload sources
+    ```
+  </Step>
+  <Step title="Download translations">
+    After translators complete their work in the Crowdin UI:
+
+    ```bash
+    crowdin download
+    ```
+
+    Translation files land in the correct `i18n/[locale]/` directories automatically.
+  </Step>
+</Steps>
+
+<Note>
+  Crowdin is one option — the i18n system works with any tool that produces files at the expected filesystem paths. Teams also commonly use Git branches, forks, or submodules to manage translations collaboratively without a SaaS platform.
+</Note>
+
+## Deployment
+
+### Single-domain deployment
+
+Build all locales together and serve them under one domain:
+
+```bash
+npm run build
+```
+
+The build output contains one SPA per locale:
+- `build/` — default locale (English)
+- `build/fr/` — French locale
+
+### Multi-domain deployment
+
+Build one locale at a time and deploy each to a different domain or subdomain:
+
+```bash
+npm run build -- --locale fr
+```
+
+Configure per-locale URLs in `docusaurus.config.js` to generate correct `hreflang` tags:
+
+```js title="docusaurus.config.js"
+export default {
+  i18n: {
+    localeConfigs: {
+      en: {
+        url: 'https://en.docusaurus.io',
+        baseUrl: '/',
+      },
+      fr: {
+        url: 'https://fr.docusaurus.io',
+        baseUrl: '/',
+      },
+    },
+  },
+};
+```

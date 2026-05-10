@@ -1,133 +1,90 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
-icon: 'star'
+title: "Docusaurus: Build Beautiful Documentation Sites"
+description: "Docusaurus is a React-powered static site generator for documentation websites. Get versioning, i18n, MDX, and search out of the box."
 ---
 
-## Setting up
+Docusaurus helps you ship a polished documentation website without building a custom tech stack. Write Markdown or MDX files, configure your site once, and deploy anywhere — GitHub Pages, Netlify, Vercel, or your own server. Built on React, it supports interactive components, versioning, internationalization, and full-text search out of the box.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Scaffold a new Docusaurus site in under a minute with `create-docusaurus`.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Learn how `docusaurus.config.js` controls every aspect of your site.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Guides" icon="book-open" href="/guides/docs">
+    Explore docs, blogs, pages, Markdown features, search, i18n, and styling.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="API Reference" icon="code" href="/api/cli">
+    Full reference for the CLI, plugins, themes, and lifecycle hooks.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Get started in minutes
 
-Everything you need to create world-class documentation.
+<Steps>
+  <Step title="Create a new site">
+    Run the scaffolding CLI to generate a ready-to-use Docusaurus project:
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+    <CodeGroup>
+    ```bash npm
+    npx create-docusaurus@latest my-website classic
+    ```
+    ```bash yarn
+    yarn create docusaurus my-website classic
+    ```
+    ```bash pnpm
+    pnpm create docusaurus my-website classic
+    ```
+    </CodeGroup>
+  </Step>
+  <Step title="Start the dev server">
+    Navigate into your project and launch the local preview:
 
-## Make your content agent ready
+    ```bash
+    cd my-website
+    npx docusaurus start
+    ```
 
-Make your docs work for humans and AI agents alike.
+    Your site is now live at `http://localhost:3000` with hot reloading enabled.
+  </Step>
+  <Step title="Write your content">
+    Add `.md` or `.mdx` files to the `docs/` directory. Docusaurus automatically generates sidebar navigation and handles routing.
+  </Step>
+  <Step title="Deploy">
+    Build and deploy to any static hosting provider:
 
-<Columns cols={2}>
-  <Card
-    title="Prompt component"
-    icon="robot"
-    href="/agent-ready/prompt"
-  >
-    Embed shareable AI prompts readers can copy or open in Cursor.
-  </Card>
-  <Card
-    title="Visibility"
-    icon="eye"
-    href="/agent-ready/visibility"
-  >
-    Show different content to humans and agents reading your docs.
-  </Card>
-  <Card
-    title="Contextual menu"
-    icon="bolt"
-    href="/agent-ready/contextual"
-  >
-    Give readers one-click access to Claude, ChatGPT, Cursor, and more.
-  </Card>
-  <Card
-    title="AI coding tools"
-    icon="wand-magic-sparkles"
-    href="/ai-tools/claude-code"
-  >
-    Set up Claude Code, Cursor, or Windsurf with Mintlify's skill.
-  </Card>
-</Columns>
+    ```bash
+    npx docusaurus build
+    ```
 
-## Need inspiration?
+    See the [deployment guide](/deployment) for GitHub Pages, Netlify, Vercel, and more.
+  </Step>
+</Steps>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+## Why Docusaurus?
+
+<CardGroup cols={2}>
+  <Card title="MDX Support" icon="file-code">
+    Write interactive documentation with JSX and React components embedded directly in Markdown files.
+  </Card>
+  <Card title="Versioning" icon="clock-rotate-left">
+    Keep multiple documentation versions in sync with your software releases.
+  </Card>
+  <Card title="Internationalization" icon="globe">
+    Translate your site into multiple languages with built-in i18n support and Crowdin integration.
+  </Card>
+  <Card title="Plugin Ecosystem" icon="puzzle-piece">
+    Extend your site with official plugins for blogs, sitemaps, PWA, analytics, and more.
+  </Card>
+  <Card title="Theme Customization" icon="palette">
+    Override any theme component via the swizzle system for complete visual control.
+  </Card>
+  <Card title="Search" icon="magnifying-glass">
+    Integrate Algolia DocSearch or local search for instant full-text search across all your docs.
+  </Card>
+</CardGroup>
+
+<Tip>
+  Try Docusaurus instantly in your browser at [docusaurus.new](https://docusaurus.new) — no installation required.
+</Tip>

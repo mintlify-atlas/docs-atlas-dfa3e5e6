@@ -1,0 +1,485 @@
+---
+title: "@docusaurus/core Client API Reference"
+description: "Reference for @docusaurus/core: Link, Head, BrowserOnly, ErrorBoundary components and hooks including useDocusaurusContext, useBaseUrl, useGlobalData, and usePluginData."
+---
+
+The `@docusaurus/core` package exposes a public client-side API for use inside React components and pages. It includes prebuilt components for navigation and document head management, React hooks to access site context and plugin data, and utility modules for environment detection.
+
+All items on this page can be imported directly from their respective Docusaurus packages without installing anything extra — they are provided by the Docusaurus runtime.
+
+---
+
+## Components
+
+### `<Link>`
+
+- **Import:** `import Link from '@docusaurus/Link'`
+
+A wrapper around React Router's `<Link>` component with Docusaurus-specific enhancements. It prefetches linked pages as they scroll into view and triggers a high-priority prefetch on hover. External links automatically receive `target="_blank" rel="noopener noreferrer"`. The `baseUrl` prefix is applied to all internal paths automatically.
+
+<Tip>
+Prefer `<Link>` over the native `<a>` tag for all internal navigation. Docusaurus performs broken-link detection, prefetching, and base URL injection only through this component.
+</Tip>
+
+#### Props
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `to` | `string` | The destination path or URL. Internal paths are relative to `baseUrl`. |
+| `...rest` | — | All other React Router `<Link>` props are forwarded. |
+
+#### Example
+
+```jsx
+import React from 'react';
+import Link from '@docusaurus/Link';
+
+export default function Nav() {
+  return (
+    <nav>
+      <Link to="/docs/intro">Documentation</Link>
+      <Link to="https://github.com/facebook/docusaurus">GitHub</Link>
+    </nav>
+  );
+}
+```
+
+---
+
+### `<Head>`
+
+- **Import:** `import Head from '@docusaurus/Head'`
+
+Manages changes to the HTML `<head>` from inside React components. Built on top of [React Helmet](https://github.com/nfl/react-helmet). Accepts standard HTML head tags as children. Duplicate tags from child components override those from parent components.
+
+#### Example
+
+```jsx
+import React from 'react';
+import Head from '@docusaurus/Head';
+
+export default function SEO({title, description}) {
+  return (
+    <Head>
+      <title>{title}</title>
+      <meta name="description" content={description} />
+      <meta property="og:title" content={title} />
+      <link rel="canonical" href="https://example.com/page" />
+    </Head>
+  );
+}
+```
+
+Nested `<Head>` components win over parent ones:
+
+```jsx
+// Rendered <title> will be "Child Title", not "Parent Title"
+<Parent>
+  <Head><title>Parent Title</title></Head>
+  <Child>
+    <Head><title>Child Title</title></Head>
+  </Child>
+</Parent>
+```
+
+---
+
+### `<Redirect>`
+
+- **Import:** `import {Redirect} from '@docusaurus/router'`
+
+Renders an immediate client-side redirect to a new location. Replaces the current entry in the browser history stack, matching the behavior of an HTTP 3xx redirect.
+
+<Note>
+`@docusaurus/router` re-exports React Router and supports all of its features.
+</Note>
+
+#### Example
+
+```jsx
+import React from 'react';
+import {Redirect} from '@docusaurus/router';
+
+export default function OldPage() {
+  return <Redirect to="/docs/new-location" />;
+}
+```
+
+---
+
+### `<BrowserOnly>`
+
+- **Import:** `import BrowserOnly from '@docusaurus/BrowserOnly'`
+
+Renders its children only after the React app has hydrated in the browser, preventing server-side rendering of code that requires browser globals such as `window` or `document`.
+
+#### Props
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `children` | `() => JSX.Element` | A render function (not a React component) that returns the browser-only JSX. Not called during Node.js/SSR. |
+| `fallback` | `JSX.Element` | Optional JSX to render on the server and during hydration. |
+
+#### Examples
+
+<CodeGroup>
+
+```jsx basic usage
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+export default function CurrentUrl() {
+  return (
+    <BrowserOnly>
+      {() => <span>Current URL: {window.location.href}</span>}
+    </BrowserOnly>
+  );
+}
+```
+
+```jsx with a client-only library
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+export default function Chart(props) {
+  return (
+    <BrowserOnly fallback={<div>Loading chart...</div>}>
+      {() => {
+        const {ChartComponent} = require('some-chart-library');
+        return <ChartComponent {...props} />;
+      }}
+    </BrowserOnly>
+  );
+}
+```
+
+</CodeGroup>
+
+---
+
+### `<ErrorBoundary>`
+
+- **Import:** `import ErrorBoundary from '@docusaurus/ErrorBoundary'`
+
+A React [error boundary](https://reactjs.org/docs/error-boundaries.html) that catches rendering errors thrown by its child component tree and displays a fallback UI instead of crashing the entire page.
+
+<Note>
+`<ErrorBoundary>` only catches client-side render errors. It does not catch errors that occur during the static build (`docusaurus build`).
+</Note>
+
+#### Props
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `fallback` | `({error, tryAgain}) => JSX.Element` | Optional render callback. Receives the caught `Error` object and a `tryAgain` function to reset the boundary. If omitted, the `@theme/Error` component is rendered instead. |
+
+<Warning>
+The `fallback` prop is a render callback, not a React functional component. You cannot call React hooks inside it.
+</Warning>
+
+#### Example
+
+```jsx
+import React from 'react';
+import ErrorBoundary from '@docusaurus/ErrorBoundary';
+
+export default function SafeWidget() {
+  return (
+    <ErrorBoundary
+      fallback={({error, tryAgain}) => (
+        <div>
+          <p>Something went wrong: {error.message}</p>
+          <button onClick={tryAgain}>Retry</button>
+        </div>
+      )}>
+      <MyUnstableWidget />
+    </ErrorBoundary>
+  );
+}
+```
+
+---
+
+## Hooks
+
+### `useDocusaurusContext()`
+
+- **Import:** `import useDocusaurusContext from '@docusaurus/useDocusaurusContext'`
+
+Returns the Docusaurus context object, which includes the full `siteConfig` from `docusaurus.config.js`, site version metadata, i18n state, and global plugin data.
+
+#### Return type
+
+```ts
+type DocusaurusContext = {
+  siteConfig: DocusaurusConfig;
+  siteMetadata: {
+    docusaurusVersion: string;
+    siteVersion?: string;
+    pluginVersions: Record<string, PluginVersionInformation>;
+  };
+  globalData: Record<string, unknown>;
+  i18n: {
+    defaultLocale: string;
+    locales: [string, ...string[]];
+    currentLocale: string;
+    localeConfigs: Record<string, {label: string; direction: string}>;
+  };
+  codeTranslations: Record<string, string>;
+};
+```
+
+<Note>
+`siteConfig` only contains JSON-serializable values. Functions and regex patterns defined in `docusaurus.config.js` are not available on the client.
+</Note>
+
+#### Example
+
+```jsx
+import React from 'react';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+
+export default function SiteInfo() {
+  const {siteConfig, siteMetadata} = useDocusaurusContext();
+  return (
+    <div>
+      <h1>{siteConfig.title}</h1>
+      <p>{siteConfig.tagline}</p>
+      <small>Docusaurus v{siteMetadata.docusaurusVersion}</small>
+    </div>
+  );
+}
+```
+
+---
+
+### `useBaseUrl()`
+
+- **Import:** `import useBaseUrl from '@docusaurus/useBaseUrl'`
+
+Prepends the site `baseUrl` to a path string. Useful when constructing image `src` or similar absolute paths that must be base-URL-aware.
+
+#### Signature
+
+```ts
+function useBaseUrl(
+  url: string,
+  options?: {
+    forcePrependBaseUrl?: boolean;
+    absolute?: boolean;
+  },
+): string;
+```
+
+<Warning>
+Do **not** use `useBaseUrl` for regular navigation links. Docusaurus automatically prepends `baseUrl` to all absolute paths in `<Link to="...">` and in Markdown links. Only use this hook for raw attribute values that bypass that processing (e.g., `<img src>`).
+</Warning>
+
+#### Example
+
+```jsx
+import React from 'react';
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
+export default function Logo() {
+  const logoSrc = useBaseUrl('/img/logo.png');
+  return <img src={logoSrc} alt="Site logo" />;
+}
+```
+
+For most image use cases, `require()` is simpler and recommended:
+
+```jsx
+<img src={require('@site/static/img/logo.png').default} alt="Site logo" />
+```
+
+---
+
+### `useBaseUrlUtils()`
+
+- **Import:** `import {useBaseUrlUtils} from '@docusaurus/useBaseUrl'`
+
+Returns a `withBaseUrl` utility function for applying the base URL to multiple paths at once.
+
+#### Example
+
+```jsx
+import React from 'react';
+import {useBaseUrlUtils} from '@docusaurus/useBaseUrl';
+
+export default function ImageGallery({paths}) {
+  const {withBaseUrl} = useBaseUrlUtils();
+  const srcs = paths.map(withBaseUrl);
+  return srcs.map((src) => <img key={src} src={src} alt="" />);
+}
+```
+
+---
+
+### `useGlobalData()`
+
+- **Import:** `import useGlobalData from '@docusaurus/useGlobalData'`
+
+Returns the full global data object populated by all plugins. Data is namespaced by plugin name and then by plugin instance ID (`"default"` when a plugin is used only once).
+
+#### Signature
+
+```ts
+function useGlobalData(): Record<
+  string,           // plugin name
+  Record<
+    string,         // plugin instance ID ("default" by default)
+    unknown         // plugin-specific data shape
+  >
+>;
+```
+
+<Tip>
+Inspect your site's global data by looking at `.docusaurus/globalData.json` after running `docusaurus start` or `docusaurus build`.
+</Tip>
+
+#### Example
+
+```jsx
+import React from 'react';
+import useGlobalData from '@docusaurus/useGlobalData';
+
+export default function AllVersions() {
+  const globalData = useGlobalData();
+  const docsData = globalData['docusaurus-plugin-content-docs']['default'];
+  return <pre>{JSON.stringify(docsData.versions, null, 2)}</pre>;
+}
+```
+
+---
+
+### `usePluginData()`
+
+- **Import:** `import {usePluginData} from '@docusaurus/useGlobalData'`
+
+Accesses global data for a specific plugin instance. This is the recommended hook for reading plugin data in most cases.
+
+#### Signature
+
+```ts
+function usePluginData(
+  pluginName: string,
+  pluginId?: string,
+  options?: {failfast?: boolean},
+): unknown;
+```
+
+| Parameter | Description |
+| --- | --- |
+| `pluginName` | The npm package name of the plugin (e.g., `'docusaurus-plugin-content-docs'`). |
+| `pluginId` | Instance ID when the same plugin is registered multiple times. Defaults to `'default'`. |
+| `options.failfast` | When `true`, throws an error if the plugin data is not found instead of returning `undefined`. |
+
+#### Example
+
+```jsx
+import React from 'react';
+import {usePluginData} from '@docusaurus/useGlobalData';
+
+export default function VersionBadge() {
+  const {currentVersion} = usePluginData('docusaurus-plugin-content-docs');
+  return <span>v{currentVersion.label}</span>;
+}
+```
+
+---
+
+### `useAllPluginInstancesData()`
+
+- **Import:** `import {useAllPluginInstancesData} from '@docusaurus/useGlobalData'`
+
+Returns data for all instances of a named plugin, keyed by plugin instance ID.
+
+#### Signature
+
+```ts
+function useAllPluginInstancesData(
+  pluginName: string,
+  options?: {failfast?: boolean},
+): Record<string, unknown>;
+```
+
+#### Example
+
+```jsx
+import React from 'react';
+import {useAllPluginInstancesData} from '@docusaurus/useGlobalData';
+
+export default function AllDocsVersions() {
+  const allInstances = useAllPluginInstancesData('docusaurus-plugin-content-docs');
+  return (
+    <ul>
+      {Object.entries(allInstances).map(([id, data]) => (
+        <li key={id}>{id}: {data.currentVersion?.label}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+---
+
+### `useIsBrowser()`
+
+- **Import:** `import useIsBrowser from '@docusaurus/useIsBrowser'`
+
+Returns `true` after the React app has hydrated in the browser, `false` during server-side rendering.
+
+<Warning>
+Use this hook instead of `typeof window !== 'undefined'` in render logic. React requires the first client-side render to match the server-side render exactly. Using `typeof window` directly can cause hydration mismatches.
+</Warning>
+
+#### Example
+
+```jsx
+import React from 'react';
+import useIsBrowser from '@docusaurus/useIsBrowser';
+
+export default function EnvironmentBadge() {
+  const isBrowser = useIsBrowser();
+  return <span>{isBrowser ? 'Browser' : 'Server'}</span>;
+}
+```
+
+---
+
+## Modules
+
+### `ExecutionEnvironment`
+
+- **Import:** `import ExecutionEnvironment from '@docusaurus/ExecutionEnvironment'`
+
+An object exposing boolean flags that describe the current JavaScript execution environment. Use this for non-rendering logic (e.g., conditional `require()` calls). For React rendering, prefer `<BrowserOnly>` or `useIsBrowser()`.
+
+| Property | Description |
+| --- | --- |
+| `ExecutionEnvironment.canUseDOM` | `true` in browser, `false` in Node.js / prerendering. |
+| `ExecutionEnvironment.canUseEventListeners` | `true` if `window.addEventListener` is available. |
+| `ExecutionEnvironment.canUseIntersectionObserver` | `true` if `IntersectionObserver` is available. |
+| `ExecutionEnvironment.canUseViewport` | `true` if `window.screen` is available. |
+
+#### Example
+
+```js
+import ExecutionEnvironment from '@docusaurus/ExecutionEnvironment';
+
+if (ExecutionEnvironment.canUseDOM) {
+  // Safe to access browser APIs here
+  const {SomeHeavyLibrary} = require('browser-only-library');
+}
+```
+
+---
+
+### `constants`
+
+- **Import:** `import {DEFAULT_PLUGIN_ID} from '@docusaurus/constants'`
+
+Exports shared constants used across Docusaurus packages.
+
+| Export | Value | Description |
+| --- | --- | --- |
+| `DEFAULT_PLUGIN_ID` | `'default'` | The default plugin instance ID used when a plugin is not registered with an explicit ID. |

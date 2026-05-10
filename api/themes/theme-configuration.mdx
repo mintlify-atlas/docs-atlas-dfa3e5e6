@@ -1,0 +1,611 @@
+---
+title: "Docusaurus themeConfig Reference: Navbar, Footer, and More"
+description: "Complete reference for the themeConfig object in docusaurus.config.js — color mode, navbar, footer, Prism, table of contents, docs, and blog options."
+---
+
+The `themeConfig` object in `docusaurus.config.js` is where you configure every visual and behavioral aspect of your Docusaurus theme — from color mode preferences and the navbar layout to syntax highlighting and table of contents depth. All options described here apply to `@docusaurus/theme-classic` and are intended to be shared by any future main themes as well.
+
+## Comprehensive example
+
+The snippet below shows the full shape of `themeConfig` with every major section populated. Individual options are explained in detail in the sections that follow.
+
+```js title="docusaurus.config.js"
+import {themes as prismThemes} from 'prism-react-renderer';
+
+export default {
+  themeConfig: {
+    // Color mode
+    colorMode: {
+      defaultMode: 'light',
+      disableSwitch: false,
+      respectPrefersColorScheme: true,
+    },
+
+    // Global meta image
+    image: 'img/social-card.png',
+
+    // Extra <meta> tags
+    metadata: [
+      {name: 'twitter:card', content: 'summary_large_image'},
+    ],
+
+    // Announcement bar
+    announcementBar: {
+      id: 'v3_announcement',
+      content: 'Docusaurus v3 is here! <a href="/blog/releases/3.0">Read the release notes</a>.',
+      backgroundColor: '#fafbfc',
+      textColor: '#091E42',
+      isCloseable: true,
+    },
+
+    // Navbar
+    navbar: {
+      title: 'My Site',
+      logo: {
+        alt: 'My Site Logo',
+        src: 'img/logo.svg',
+        srcDark: 'img/logo_dark.svg',
+      },
+      hideOnScroll: false,
+      style: 'primary',
+      items: [
+        {type: 'doc', docId: 'intro', label: 'Docs', position: 'left'},
+        {to: '/blog', label: 'Blog', position: 'left'},
+        {type: 'docsVersionDropdown', position: 'right'},
+        {type: 'localeDropdown', position: 'right'},
+        {
+          href: 'https://github.com/example/repo',
+          label: 'GitHub',
+          position: 'right',
+        },
+      ],
+    },
+
+    // Footer
+    footer: {
+      style: 'dark',
+      logo: {
+        alt: 'My Site Logo',
+        src: 'img/logo.svg',
+        href: 'https://example.com',
+        width: 160,
+      },
+      copyright: `Copyright © ${new Date().getFullYear()} My Project, Inc.`,
+      links: [
+        {
+          title: 'Docs',
+          items: [
+            {label: 'Getting Started', to: '/docs/intro'},
+          ],
+        },
+        {
+          title: 'Community',
+          items: [
+            {label: 'Discord', href: 'https://discord.gg/example'},
+          ],
+        },
+      ],
+    },
+
+    // Syntax highlighting
+    prism: {
+      theme: prismThemes.github,
+      darkTheme: prismThemes.dracula,
+      defaultLanguage: 'javascript',
+      additionalLanguages: ['bash', 'diff', 'json'],
+    },
+
+    // Table of contents
+    tableOfContents: {
+      minHeadingLevel: 2,
+      maxHeadingLevel: 4,
+    },
+
+    // Docs plugin overrides
+    docs: {
+      versionPersistence: 'localStorage',
+      sidebar: {
+        hideable: true,
+        autoCollapseCategories: true,
+      },
+    },
+
+    // Blog plugin overrides
+    blog: {
+      sidebar: {
+        groupByYear: true,
+      },
+    },
+  },
+};
+```
+
+---
+
+## Color mode
+
+The classic theme provides light and dark mode out of the box, with a toggle in the navbar. Configure it using the `colorMode` object.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `defaultMode` | `'light' \| 'dark'` | `'light'` | Color mode applied when a user visits the site for the first time. |
+| `disableSwitch` | `boolean` | `false` | Hides the color mode toggle in the navbar. Useful for single-theme sites. |
+| `respectPrefersColorScheme` | `boolean` | `false` | When `true`, uses the OS-level `prefers-color-scheme` preference instead of `defaultMode`. |
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    colorMode: {
+      defaultMode: 'light',
+      disableSwitch: false,
+      respectPrefersColorScheme: true,
+    },
+  },
+};
+```
+
+<Warning>
+  When `respectPrefersColorScheme` is `true`, the `defaultMode` setting is ignored — user system preferences take precedence. If you want a fixed color mode that ignores system settings, keep `respectPrefersColorScheme: false` and set `disableSwitch: true`.
+</Warning>
+
+---
+
+## Navbar
+
+The `navbar` object controls the top navigation bar, including its title, logo, link items, scroll behavior, and style.
+
+### Top-level navbar options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `title` | `string` | `undefined` | Text displayed next to the logo. |
+| `logo` | `Logo` | `undefined` | Logo image configuration (see below). |
+| `items` | `NavbarItem[]` | `[]` | Array of items to render in the navbar. |
+| `hideOnScroll` | `boolean` | `false` | When `true`, the navbar slides out of view when the user scrolls down and reappears on scroll up. |
+| `style` | `'primary' \| 'dark'` | Follows color theme | Forces a static navbar style independent of the active color mode. |
+
+### Navbar logo
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `alt` | `string` | `undefined` | Alt text for the logo image. |
+| `src` | `string` | **Required** | Path to the logo image (relative to the `static/` directory). |
+| `srcDark` | `string` | Same as `src` | Alternative image used in dark mode. |
+| `href` | `string` | Site base URL | URL the logo links to when clicked. |
+| `target` | `string` | Auto-detected | The `target` attribute of the logo anchor tag. |
+| `width` | `string \| number` | `undefined` | Width of the logo image. |
+| `height` | `string \| number` | `undefined` | Height of the logo image. |
+| `className` | `string` | `undefined` | CSS class applied to the `<img>` element. |
+| `style` | `object` | `undefined` | Inline React style object applied to the `<img>` element. |
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    navbar: {
+      logo: {
+        alt: 'My Site Logo',
+        src: 'img/logo.svg',
+        srcDark: 'img/logo_dark.svg',
+        href: 'https://mysite.com',
+        width: 32,
+        height: 32,
+      },
+    },
+  },
+};
+```
+
+### Navbar item types
+
+<AccordionGroup>
+  <Accordion title="Default link (`type: 'default'`)">
+    A standard internal or external hyperlink. External links automatically receive `target="_blank" rel="noopener noreferrer"`.
+
+    | Option | Type | Default | Description |
+    |---|---|---|---|
+    | `type` | `'default'` | Optional | Explicitly sets the item type. |
+    | `label` | `string` | **Required** | Display text. |
+    | `to` | `string` | — | Internal route (base URL prepended automatically). |
+    | `href` | `string` | — | Full external URL. Use `to` or `href`, not both. |
+    | `position` | `'left' \| 'right'` | `'left'` | Side of the navbar to render on. |
+    | `activeBasePath` | `string` | `to` / `href` | Path prefix that triggers the active link style. |
+    | `activeBaseRegex` | `string` | `undefined` | Regex alternative to `activeBasePath`. |
+    | `className` | `string` | `''` | Custom CSS class. |
+    | `html` | `string` | Optional | Raw HTML label instead of plain text. |
+
+    ```js title="docusaurus.config.js"
+    {
+      to: 'docs/intro',
+      label: 'Docs',
+      position: 'left',
+      activeBaseRegex: 'docs/(next|v\\d+)',
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Dropdown (`type: 'dropdown'`)">
+    A clickable label that reveals a dropdown menu. The dropdown itself can contain links, doc links, doc sidebar links, version items, and HTML items.
+
+    | Option | Type | Default | Description |
+    |---|---|---|---|
+    | `type` | `'dropdown'` | Optional | Sets the item as a dropdown. |
+    | `label` | `string` | **Required** | Display text on the trigger button. |
+    | `items` | `LinkLikeItem[]` | **Required** | Items shown in the dropdown panel. |
+    | `position` | `'left' \| 'right'` | `'left'` | Side of the navbar. |
+
+    ```js title="docusaurus.config.js"
+    {
+      type: 'dropdown',
+      label: 'Community',
+      position: 'left',
+      items: [
+        {label: 'Discord', href: 'https://discord.gg/example'},
+        {type: 'doc', label: 'Contributing', docId: 'contributing'},
+      ],
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Doc link (`type: 'doc'`)">
+    Links to a specific document by its ID and activates when you are browsing any document in the same sidebar.
+
+    | Option | Type | Default | Description |
+    |---|---|---|---|
+    | `type` | `'doc'` | **Required** | Sets the item type. |
+    | `docId` | `string` | **Required** | ID of the target document. |
+    | `label` | `string` | `docId` | Display text. |
+    | `position` | `'left' \| 'right'` | `'left'` | Side of the navbar. |
+    | `docsPluginId` | `string` | `'default'` | ID of the docs plugin instance the doc belongs to. |
+
+    ```js title="docusaurus.config.js"
+    {type: 'doc', docId: 'introduction', label: 'Docs', position: 'left'}
+    ```
+  </Accordion>
+
+  <Accordion title="Doc sidebar link (`type: 'docSidebar'`)">
+    Links to the first document of a given sidebar. Useful when the entry-point document changes over time.
+
+    | Option | Type | Default | Description |
+    |---|---|---|---|
+    | `type` | `'docSidebar'` | **Required** | Sets the item type. |
+    | `sidebarId` | `string` | **Required** | ID of the sidebar as defined in `sidebars.js`. |
+    | `label` | `string` | First document's label | Display text. |
+    | `position` | `'left' \| 'right'` | `'left'` | Side of the navbar. |
+    | `docsPluginId` | `string` | `'default'` | Docs plugin instance. |
+
+    ```js title="docusaurus.config.js"
+    {type: 'docSidebar', sidebarId: 'api', label: 'API Reference', position: 'left'}
+    ```
+  </Accordion>
+
+  <Accordion title="Docs version dropdown (`type: 'docsVersionDropdown'`)">
+    Renders a dropdown listing all available documentation versions, letting users switch versions while staying on the same document.
+
+    | Option | Type | Default | Description |
+    |---|---|---|---|
+    | `type` | `'docsVersionDropdown'` | **Required** | Sets the item type. |
+    | `position` | `'left' \| 'right'` | `'left'` | Side of the navbar. |
+    | `dropdownItemsBefore` | `LinkLikeItem[]` | `[]` | Extra items prepended to the dropdown list. |
+    | `dropdownItemsAfter` | `LinkLikeItem[]` | `[]` | Extra items appended to the dropdown list. |
+    | `docsPluginId` | `string` | `'default'` | Docs plugin instance. |
+    | `dropdownActiveClassDisabled` | `boolean` | `false` | Prevents the active-link class from being applied. |
+    | `versions` | `DropdownVersions` | `undefined` | Explicit list of versions to include. |
+
+    ```js title="docusaurus.config.js"
+    {
+      type: 'docsVersionDropdown',
+      position: 'right',
+      dropdownItemsAfter: [{to: '/versions', label: 'All versions'}],
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Docs version link (`type: 'docsVersion'`)">
+    Links to the currently active docs version, falling back to the latest version.
+
+    | Option | Type | Default | Description |
+    |---|---|---|---|
+    | `type` | `'docsVersion'` | **Required** | Sets the item type. |
+    | `label` | `string` | Active version label | Display text. |
+    | `to` | `string` | Active version path | Override the link destination. |
+    | `position` | `'left' \| 'right'` | `'left'` | Side of the navbar. |
+    | `docsPluginId` | `string` | `'default'` | Docs plugin instance. |
+
+    ```js title="docusaurus.config.js"
+    {type: 'docsVersion', position: 'left', label: 'Stable'}
+    ```
+  </Accordion>
+
+  <Accordion title="Locale dropdown (`type: 'localeDropdown'`)">
+    Renders a dropdown with all configured locales so users can switch languages while remaining on the same page.
+
+    | Option | Type | Default | Description |
+    |---|---|---|---|
+    | `type` | `'localeDropdown'` | **Required** | Sets the item type. |
+    | `position` | `'left' \| 'right'` | `'left'` | Side of the navbar. |
+    | `dropdownItemsBefore` | `LinkLikeItem[]` | `[]` | Extra items prepended to the dropdown. |
+    | `dropdownItemsAfter` | `LinkLikeItem[]` | `[]` | Extra items appended to the dropdown. |
+    | `queryString` | `string` | `undefined` | Query string appended to the URL on locale switch. |
+
+    ```js title="docusaurus.config.js"
+    {
+      type: 'localeDropdown',
+      position: 'right',
+      dropdownItemsAfter: [{to: '/help-translate', label: 'Help us translate'}],
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Search bar (`type: 'search'`)">
+    By default, the search bar is placed at the far right of the navbar. Use this item type to position it elsewhere.
+
+    | Option | Type | Default | Description |
+    |---|---|---|---|
+    | `type` | `'search'` | **Required** | Sets the item type to a search bar slot. |
+    | `position` | `'left' \| 'right'` | `'left'` | Side of the navbar. |
+    | `className` | `string` | — | Custom CSS class. |
+
+    ```js title="docusaurus.config.js"
+    {type: 'search', position: 'right'}
+    ```
+  </Accordion>
+
+  <Accordion title="Custom HTML (`type: 'html'`)">
+    Renders arbitrary HTML inside a navbar item. Useful for badges, images, or custom interactive elements.
+
+    | Option | Type | Default | Description |
+    |---|---|---|---|
+    | `type` | `'html'` | **Required** | Sets the item type. |
+    | `value` | `string` | `''` | HTML string to render. |
+    | `position` | `'left' \| 'right'` | `'left'` | Side of the navbar. |
+    | `className` | `string` | `''` | CSS class on the wrapper element. |
+
+    ```js title="docusaurus.config.js"
+    {type: 'html', position: 'right', value: '<button>Feedback</button>'}
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Footer
+
+The `footer` object controls the site footer, including its color style, logo, copyright notice, and link columns.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `style` | `'light' \| 'dark'` | `'light'` | Color theme of the footer. |
+| `logo` | `Logo` | `undefined` | Footer logo (same shape as the navbar logo). |
+| `copyright` | `string` | `undefined` | Copyright text shown at the bottom. Supports HTML. |
+| `links` | `Column[] \| FooterLink[]` | `[]` | Link columns (multi-column) or a flat list (simple footer). |
+
+### Multi-column footer
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    footer: {
+      style: 'dark',
+      copyright: `Copyright © ${new Date().getFullYear()} My Project.`,
+      links: [
+        {
+          title: 'Docs',
+          items: [
+            {label: 'Getting Started', to: '/docs/intro'},
+            {label: 'API Reference', to: '/docs/api'},
+          ],
+        },
+        {
+          title: 'Community',
+          items: [
+            {label: 'Discord', href: 'https://discord.gg/example'},
+            {label: 'Twitter', href: 'https://twitter.com/example'},
+          ],
+        },
+      ],
+    },
+  },
+};
+```
+
+Each column item (`FooterItem`) accepts:
+
+| Option | Type | Description |
+|---|---|---|
+| `label` | `string` | Link text. |
+| `to` | `string` | Internal route. |
+| `href` | `string` | External URL. Use `to` or `href`, not both. |
+| `html` | `string` | Raw HTML instead of a link (use alone; no `label`, `to`, or `href`). |
+
+### Simple footer
+
+Pass a flat array of `FooterItem` objects (no `title`) to render a single-row link list instead of columns.
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    footer: {
+      links: [
+        {label: 'Privacy', href: 'https://example.com/privacy'},
+        {label: 'Terms', href: 'https://example.com/terms'},
+      ],
+    },
+  },
+};
+```
+
+---
+
+## Prism syntax highlighting
+
+Docusaurus uses [Prism React Renderer](https://github.com/FormidableLabs/prism-react-renderer) for code block syntax highlighting. All options live in `themeConfig.prism`.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `theme` | `PrismTheme` | `palenight` | Prism theme for light mode code blocks. |
+| `darkTheme` | `PrismTheme` | `palenight` | Prism theme for dark mode code blocks. |
+| `defaultLanguage` | `string` | `undefined` | Language to apply when no language tag is provided on a code fence. |
+| `additionalLanguages` | `string[]` | `[]` | Extra Prism language definitions to bundle (e.g., `['bash', 'diff', 'php']`). |
+| `magicComments` | `MagicCommentConfig[]` | `[highlightLine]` | Custom magic comment definitions for line-level annotations. |
+
+```js title="docusaurus.config.js"
+import {themes as prismThemes} from 'prism-react-renderer';
+
+export default {
+  themeConfig: {
+    prism: {
+      theme: prismThemes.github,
+      darkTheme: prismThemes.dracula,
+      defaultLanguage: 'javascript',
+      additionalLanguages: ['bash', 'diff', 'json', 'php'],
+    },
+  },
+};
+```
+
+<Tip>
+  You can find the full list of Prism language identifiers at [prismjs.com/#supported-languages](https://prismjs.com/#supported-languages). Import themes from `prism-react-renderer` rather than defining them manually.
+</Tip>
+
+---
+
+## Table of contents
+
+`themeConfig.tableOfContents` sets the heading depth range displayed in the TOC shown on the right side of doc pages.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `minHeadingLevel` | `number` | `2` | Smallest heading level to include. Must be between 2 and 6, and no greater than `maxHeadingLevel`. |
+| `maxHeadingLevel` | `number` | `3` | Largest heading level to include. Must be between 2 and 6. |
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    tableOfContents: {
+      minHeadingLevel: 2,
+      maxHeadingLevel: 4,
+    },
+  },
+};
+```
+
+<Note>
+  You can override the TOC depth per page using the `toc_min_heading_level` and `toc_max_heading_level` frontmatter keys on individual MDX files.
+</Note>
+
+---
+
+## Docs plugin options
+
+`themeConfig.docs` lets you configure UI behavior specific to the docs plugin.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `versionPersistence` | `'localStorage' \| 'none'` | `undefined` | Whether the user's chosen docs version is remembered in `localStorage`. |
+| `sidebar.hideable` | `boolean` | `false` | Adds a hide/show button at the bottom of the sidebar, allowing users to collapse it. |
+| `sidebar.autoCollapseCategories` | `boolean` | `false` | Automatically collapses sibling categories when you navigate into a new category. |
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    docs: {
+      versionPersistence: 'localStorage',
+      sidebar: {
+        hideable: true,
+        autoCollapseCategories: true,
+      },
+    },
+  },
+};
+```
+
+---
+
+## Blog plugin options
+
+`themeConfig.blog` configures the sidebar behavior of the blog plugin's UI.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `sidebar.groupByYear` | `boolean` | `true` | When `true`, blog posts in the sidebar are grouped under year headings. |
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    blog: {
+      sidebar: {
+        groupByYear: false,
+      },
+    },
+  },
+};
+```
+
+---
+
+## Announcement bar
+
+The announcement bar is an optional, dismissible panel displayed above the navbar. Configure it using `themeConfig.announcementBar`.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `id` | `string` | `'announcement-bar'` | Unique identifier used to track dismissal in `localStorage`. Change the ID to re-show a bar that users have previously closed. |
+| `content` | `string` | `''` | HTML content of the announcement. |
+| `backgroundColor` | `string` | `'#fff'` | Background color of the bar. |
+| `textColor` | `string` | `'#000'` | Text color inside the bar. |
+| `isCloseable` | `boolean` | `true` | Whether to show a dismiss button. |
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    announcementBar: {
+      id: 'v3_launch',
+      content: 'Docusaurus v3 is now available! <a href="/blog/releases/3.0">Read the blog post</a>.',
+      backgroundColor: '#20232a',
+      textColor: '#fff',
+      isCloseable: true,
+    },
+  },
+};
+```
+
+---
+
+## Global meta image and metadata
+
+Set a default social card image and inject arbitrary `<meta>` tags site-wide:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `image` | `string` | `undefined` | Default `og:image` and `twitter:image` URL. Relative paths resolve to `static/`. Cannot be an SVG. |
+| `metadata` | `Metadata[]` | `[]` | Array of objects passed directly as `<meta>` tag attributes (`name`, `property`, `content`, etc.). |
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    image: 'img/social-card.png',
+    metadata: [
+      {name: 'twitter:card', content: 'summary_large_image'},
+      {name: 'twitter:site', content: '@myproject'},
+    ],
+  },
+};
+```
+
+---
+
+## i18n: translation files
+
+Theme strings (navbar labels, footer text, etc.) are translated through JSON files located in:
+
+```
+website/i18n/[locale]/docusaurus-theme-classic/
+├── navbar.json
+└── footer.json
+```
+
+Generate the translation file templates with:
+
+```bash
+npx docusaurus write-translations --locale fr
+```

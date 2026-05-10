@@ -1,0 +1,220 @@
+---
+title: "Use TypeScript in Your Docusaurus Project"
+description: "Set up TypeScript in Docusaurus, type your config file with docusaurus.config.ts, run type checks, and write typed swizzled theme components."
+---
+
+Docusaurus is written in TypeScript and ships first-class TypeScript support. You can type your configuration file, write TypeScript theme components, and run `tsc` as part of your CI pipeline. The minimum required TypeScript version is **5.1**.
+
+## Starting a TypeScript project
+
+If you are creating a new site, pass the `--typescript` flag to `create-docusaurus` to scaffold a fully typed project from the start:
+
+```bash
+npx create-docusaurus@latest my-website classic --typescript
+```
+
+For an existing JavaScript project, follow the setup steps below to add TypeScript incrementally.
+
+## Setting up TypeScript in an existing project
+
+<Steps>
+  <Step title="Install the required packages">
+    Add the TypeScript compiler and the Docusaurus type packages as dev dependencies:
+
+    <Tabs>
+      <Tab title="npm">
+        ```bash
+        npm install --save-dev typescript @docusaurus/module-type-aliases @docusaurus/tsconfig @docusaurus/types
+        ```
+      </Tab>
+      <Tab title="yarn">
+        ```bash
+        yarn add --dev typescript @docusaurus/module-type-aliases @docusaurus/tsconfig @docusaurus/types
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  <Step title="Add tsconfig.json">
+    Create `tsconfig.json` in your project root. Docusaurus ships a ready-made base config you can extend:
+
+    ```json title="tsconfig.json"
+    {
+      "extends": "@docusaurus/tsconfig",
+      "compilerOptions": {
+        "baseUrl": "."
+      }
+    }
+    ```
+
+    Docusaurus does not use this file to compile your project — it is picked up by your editor and by `tsc` when you run a manual type check.
+  </Step>
+</Steps>
+
+## Typing docusaurus.config.ts
+
+You can rename `docusaurus.config.js` to `docusaurus.config.ts` and use the `Config` type from `@docusaurus/types` to get full editor autocomplete and compile-time validation:
+
+```ts title="docusaurus.config.ts"
+import type {Config} from '@docusaurus/types';
+import type * as Preset from '@docusaurus/preset-classic';
+
+const config: Config = {
+  title: 'My Site',
+  favicon: 'img/favicon.ico',
+
+  presets: [
+    [
+      'classic',
+      {
+        docs: {
+          sidebarPath: './sidebars.js',
+        },
+        blog: {
+          showReadingTime: true,
+        },
+      } satisfies Preset.Options,
+    ],
+  ],
+
+  themeConfig: {
+    navbar: {
+      title: 'My Site',
+    },
+  } satisfies Preset.ThemeConfig,
+};
+
+export default config;
+```
+
+The `satisfies` operator (TypeScript 4.9+) lets you keep type checking while still inferring the precise type of each field. Import `Preset.Options` and `Preset.ThemeConfig` from `@docusaurus/preset-classic` for the preset-specific types.
+
+<Tip>
+Your IDE (VS Code, WebStorm, IntelliJ) will offer full autocomplete on config fields once the type annotation is in place.
+</Tip>
+
+### JSDoc annotations for .js files
+
+If you prefer to keep a `.js` config file, you can still get type checking with JSDoc annotations and a `// @ts-check` comment:
+
+```js title="docusaurus.config.js"
+// @ts-check
+
+/** @type {import('@docusaurus/types').Config} */
+const config = {
+  title: 'My Site',
+  favicon: 'img/favicon.ico',
+
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      /** @type {import('@docusaurus/preset-classic').Options} */
+      ({
+        docs: {},
+        blog: {},
+      }),
+    ],
+  ],
+
+  themeConfig:
+    /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
+    ({
+      navbar: {title: 'My Site'},
+    }),
+};
+
+export default config;
+```
+
+## Running a type check
+
+Add a `typecheck` script to your `package.json`:
+
+```json title="package.json"
+{
+  "scripts": {
+    "typecheck": "tsc"
+  }
+}
+```
+
+Then run it:
+
+```bash
+npm run typecheck
+```
+
+This is especially useful in CI to catch type errors before deploying. The Docusaurus website itself runs `yarn workspace website typecheck` as part of its own CI checks.
+
+<Note>
+`tsc` with the `@docusaurus/tsconfig` base does not emit output files — it only type-checks. Your site is still built by the Docusaurus bundler (webpack or Rspack), not by `tsc`.
+</Note>
+
+## Ambient types for optional plugins
+
+Some plugins and themes ship ambient `.d.ts` files that TypeScript does not load automatically. For example, importing from `@theme/Playground` (provided by `@docusaurus/theme-live-codeblock`) produces `TS2307: Cannot find module '@theme/Playground'` until you opt in to that plugin's types.
+
+The recommended approach is a triple-slash reference in a project-level `.d.ts` file:
+
+```ts title="src/types.d.ts"
+/// <reference types="@docusaurus/theme-live-codeblock" />
+```
+
+Alternatively, add the package to the `types` compiler option in `tsconfig.json`:
+
+```json title="tsconfig.json"
+{
+  "extends": "@docusaurus/tsconfig",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["@docusaurus/theme-live-codeblock"]
+  }
+}
+```
+
+<Warning>
+Adding entries to `types` disables TypeScript's automatic loading of `@types/*` packages. You must explicitly list any other `@types/` packages your project depends on.
+</Warning>
+
+## Typing swizzled components
+
+When you swizzle a component, you can request TypeScript source by adding the `--typescript` flag:
+
+```bash
+npm run swizzle @docusaurus/theme-classic Footer -- --typescript
+```
+
+This generates `src/theme/Footer/index.tsx` (and `styles.module.css` where applicable) instead of a `.js` file.
+
+All official Docusaurus themes support TypeScript theme components, including:
+
+- `@docusaurus/theme-classic`
+- `@docusaurus/theme-live-codeblock`
+- `@docusaurus/theme-search-algolia`
+
+A typed wrapper looks like this:
+
+```tsx title="src/theme/Footer/index.tsx"
+import React from 'react';
+import Footer from '@theme-original/Footer';
+import type FooterType from '@theme/Footer';
+import type {WrapperProps} from '@docusaurus/types';
+
+type Props = WrapperProps<typeof FooterType>;
+
+export default function FooterWrapper(props: Props): JSX.Element {
+  return (
+    <>
+      <section>
+        <p>Custom content above the footer</p>
+      </section>
+      <Footer {...props} />
+    </>
+  );
+}
+```
+
+`WrapperProps<typeof FooterType>` derives the correct prop types from the original component's type definition, so your wrapper stays in sync automatically when the upstream props change.
+
+<Info>
+If you are authoring a Docusaurus theme package and want to add TypeScript support for swizzlable components, implement the `getTypeScriptThemePath` lifecycle API. See the [Lifecycle APIs documentation](https://docusaurus.io/docs/api/plugin-methods/extend-infrastructure#getTypeScriptThemePath) for details.
+</Info>

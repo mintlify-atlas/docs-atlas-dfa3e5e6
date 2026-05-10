@@ -1,0 +1,300 @@
+---
+title: "Docusaurus Client Modules, Hooks, and Lifecycle APIs"
+description: "Explore Docusaurus client modules, the clientModules config option, route lifecycle hooks like onRouteDidUpdate, useDocusaurusContext, and the theme alias system."
+---
+
+The Docusaurus client is the JavaScript layer that runs in the user's browser after the static HTML has been delivered. It consists of the React component tree provided by themes, client modules that register global side-effects, and a set of hooks that give any component access to site configuration and routing state. Understanding this layer is essential for customising behaviour — from injecting a global analytics script to reading `themeConfig` values inside your own components.
+
+## Theme aliases and the layered architecture
+
+Docusaurus themes work by exporting components under the `@theme` Webpack alias. When your code writes `import Navbar from '@theme/Navbar'`, Webpack resolves it through a priority stack:
+
+1. **User swizzles** — `website/src/theme/Navbar.js` (highest priority)
+2. **Theme package** — `@docusaurus/theme-classic/theme/Navbar.js`
+3. **Core fallbacks** — built-in Docusaurus components (rarely needed)
+
+This layered resolution is what makes swizzling work: you place a file in `src/theme/` and it shadows the theme package's version everywhere in the build, without modifying `node_modules`.
+
+### The component stack in detail
+
+When multiple themes or plugins provide the same component, Docusaurus builds a stack:
+
+```
++---------------------------------------------------+
+|        website/src/theme/CodeBlock.js             |  ← @theme/CodeBlock
++---------------------------------------------------+
+| theme-live-codeblock/theme/CodeBlock/index.js     |  ← @theme-original/CodeBlock
++---------------------------------------------------+
+| plugin-awesome-codeblock/theme/CodeBlock.js       |
++---------------------------------------------------+
+| theme-classic/theme/CodeBlock/index.js            |  ← @theme-init/CodeBlock
++---------------------------------------------------+
+```
+
+<AccordionGroup>
+  <Accordion title="@theme/*">
+    Always points to the topmost component in the stack. When you swizzle `CodeBlock`, every component that imports `@theme/CodeBlock` automatically gets your version.
+  </Accordion>
+  <Accordion title="@theme-original/*">
+    Points to the topmost **non-swizzled** component. Use this inside a swizzled component to delegate to the theme's original implementation — the standard wrapper pattern.
+  </Accordion>
+  <Accordion title="@theme-init/*">
+    Points to the bottommost component — typically the one originally provided by `theme-classic`. Safe to use in plugin-provided theme enhancements. Only exists when more than one theme provides the same component name.
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+Plugin authors should avoid `@theme-original/*` because their component might be at the top of the stack, making it a circular import. Use `@theme-init/*` instead to reference the base implementation.
+</Warning>
+
+### Wrapping example
+
+```js title="src/theme/CodeBlock/index.js"
+import InitialCodeBlock from '@theme-init/CodeBlock';
+import React from 'react';
+
+// Enhance the base CodeBlock with a live playground for props.live === true
+export default function CodeBlock(props) {
+  return props.live ? (
+    <ReactLivePlayground {...props} />
+  ) : (
+    <InitialCodeBlock {...props} />
+  );
+}
+```
+
+## Client modules
+
+Client modules are JavaScript (or CSS) files that Docusaurus imports **globally**, before React renders the initial UI. They are the right place for side-effects that must be present on every page: analytics initialisation, global event listeners, custom fonts, or global CSS.
+
+```js title="packages/docusaurus/src/client/App.tsx (simplified)"
+// All client modules are imported here, before any route component renders
+import '@generated/client-modules';
+```
+
+### Registering client modules
+
+<Tabs>
+  <Tab title="Via docusaurus.config.js">
+    ```js title="docusaurus.config.js"
+    export default {
+      clientModules: [
+        './src/myGlobalScript.js',
+        './src/myGlobalStyles.css',
+      ],
+    };
+    ```
+  </Tab>
+  <Tab title="Via a plugin">
+    ```js title="my-plugin/index.js"
+    export default function myPlugin() {
+      return {
+        name: 'my-plugin',
+        getClientModules() {
+          return [require.resolve('./mySideEffect.js')];
+        },
+      };
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Global JavaScript example
+
+```js title="src/myGlobalScript.js"
+import ExecutionEnvironment from '@docusaurus/ExecutionEnvironment';
+
+if (ExecutionEnvironment.canUseDOM) {
+  // Runs once in the browser when the bundle first loads
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Period') {
+      location.assign(location.href.replace('.com', '.dev'));
+    }
+  });
+}
+```
+
+<Note>
+Client modules run during SSR as well as in the browser. Always guard browser-only code with `ExecutionEnvironment.canUseDOM` (or inside a `useEffect`) or you will get `ReferenceError: window is not defined` during the build.
+</Note>
+
+### Global CSS example
+
+```css title="src/myGlobalStyles.css"
+/* Imported as a client module — applies to every page */
+:root {
+  --custom-primary: #1877f2;
+}
+
+.globalBanner {
+  background: var(--custom-primary);
+  color: #fff;
+  padding: 0.5rem 1rem;
+}
+```
+
+## Route lifecycle hooks
+
+Because Docusaurus is a single-page application, `<script>` tags execute only once — on the very first page load. If you need to run JavaScript on every navigation (e.g. to send a pageview to an analytics service, or to reset a UI element), export the lifecycle functions `onRouteUpdate` and `onRouteDidUpdate` from a client module.
+
+### Timing of events
+
+<Steps>
+  <Step title="User clicks a link">
+    React Router records the new location. `onRouteUpdate` fires with `{location, previousLocation}`.
+  </Step>
+  <Step title="Docusaurus preloads the next route's assets">
+    The current page remains visible. Any cleanup function returned by `onRouteUpdate` is called when preloading completes.
+  </Step>
+  <Step title="Next route's assets finish loading">
+    The cleanup callback from step 2 runs here.
+  </Step>
+  <Step title="New route component renders to DOM">
+    `onRouteDidUpdate` fires with `{location, previousLocation}`. The new page's DOM is fully available at this point.
+  </Step>
+</Steps>
+
+### JavaScript lifecycle example
+
+```js title="src/clientModules/analytics.js"
+export function onRouteUpdate({location, previousLocation}) {
+  if (location.pathname !== previousLocation?.pathname) {
+    // Start a progress bar while the next route loads
+    const timeout = window.setTimeout(() => window.nprogress?.start(), 200);
+    // Return a cleanup function — called when the next route finishes loading
+    return () => window.clearTimeout(timeout);
+  }
+  return undefined;
+}
+
+export function onRouteDidUpdate({location, previousLocation}) {
+  if (location.pathname !== previousLocation?.pathname) {
+    // New page's DOM is ready — send pageview
+    window.gtag?.('event', 'page_view', {page_path: location.pathname});
+  }
+}
+```
+
+### TypeScript lifecycle example
+
+```ts title="src/clientModules/analytics.ts"
+import type {ClientModule} from '@docusaurus/types';
+
+const module: ClientModule = {
+  onRouteUpdate({location, previousLocation}) {
+    if (location.pathname !== previousLocation?.pathname) {
+      const timeout = window.setTimeout(() => window.nprogress?.start(), 200);
+      return () => window.clearTimeout(timeout);
+    }
+    return undefined;
+  },
+  onRouteDidUpdate({location, previousLocation}) {
+    if (location.pathname !== previousLocation?.pathname) {
+      window.gtag?.('event', 'page_view', {page_path: location.pathname});
+    }
+  },
+};
+
+export default module;
+```
+
+<Tip>
+Both lifecycle functions fire on the first render as well as on subsequent navigations. They never fire during SSR, so browser globals are always safe inside them.
+</Tip>
+
+## `useDocusaurusContext`
+
+The `useDocusaurusContext` hook returns the full `DocusaurusContext` object, which is built from generated files at bundle time and never changes at runtime. It is the canonical way to access site configuration in any theme component.
+
+```jsx title="src/components/SiteTitle.jsx"
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+
+export default function SiteTitle() {
+  const {siteConfig, siteMetadata, globalData, i18n} = useDocusaurusContext();
+
+  return (
+    <header>
+      <h1>{siteConfig.title}</h1>
+      <p>{siteConfig.tagline}</p>
+      <small>
+        Docusaurus {siteMetadata.docusaurusVersion} · locale{' '}
+        {i18n.currentLocale}
+      </small>
+    </header>
+  );
+}
+```
+
+The context object contains:
+
+| Property | Type | Contents |
+|---|---|---|
+| `siteConfig` | `DocusaurusConfig` | The full `docusaurus.config.js` value after serialisation. Includes `title`, `baseUrl`, `themeConfig`, `customFields`, etc. |
+| `siteMetadata` | `SiteMetadata` | Docusaurus version, plugin versions, Node version. |
+| `globalData` | `GlobalData` | Data published by plugins via `setGlobalData`, keyed by plugin name and ID. |
+| `i18n` | `I18n` | Current locale, default locale, list of all configured locales. |
+| `codeTranslations` | `CodeTranslations` | Translated strings for built-in UI text. |
+
+## `useThemeConfig` and theme hooks
+
+`@docusaurus/theme-common` exports a collection of hooks for reading and managing theme state. The most commonly used is `useThemeConfig`, which returns the `themeConfig` section of `siteConfig` with full TypeScript types:
+
+```tsx title="src/theme/Navbar/index.tsx"
+import {useThemeConfig} from '@docusaurus/theme-common';
+
+export default function Navbar() {
+  const {navbar} = useThemeConfig();
+  return (
+    <nav>
+      <a href="/">{navbar.title}</a>
+    </nav>
+  );
+}
+```
+
+Other commonly used hooks from `@docusaurus/theme-common`:
+
+<CodeGroup>
+
+```tsx useColorMode.tsx
+import {useColorMode} from '@docusaurus/theme-common';
+
+function ThemeToggle() {
+  const {colorMode, setColorMode} = useColorMode();
+  return (
+    <button onClick={() => setColorMode(colorMode === 'dark' ? 'light' : 'dark')}>
+      Switch to {colorMode === 'dark' ? 'light' : 'dark'} mode
+    </button>
+  );
+}
+```
+
+```tsx usePrismTheme.tsx
+import {usePrismTheme} from '@docusaurus/theme-common';
+import {Highlight} from 'prism-react-renderer';
+
+function MyCodeBlock({code}: {code: string}) {
+  const prismTheme = usePrismTheme();
+  return (
+    <Highlight theme={prismTheme} code={code} language="tsx">
+      {({className, style, tokens, getLineProps, getTokenProps}) => (
+        <pre className={className} style={style}>
+          {tokens.map((line, i) => (
+            <div key={i} {...getLineProps({line})}>
+              {line.map((token, key) => (
+                <span key={key} {...getTokenProps({token})} />
+              ))}
+            </div>
+          ))}
+        </pre>
+      )}
+    </Highlight>
+  );
+}
+```
+
+</CodeGroup>
+
+<Tip>
+Prefer using React hooks and component swizzling over client module lifecycles for anything that involves React state or context. Lifecycle functions are purely imperative and cannot call hooks or access React context.
+</Tip>

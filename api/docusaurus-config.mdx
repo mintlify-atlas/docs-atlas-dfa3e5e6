@@ -1,0 +1,616 @@
+---
+title: "docusaurus.config.js Configuration File Reference"
+description: "Full reference for docusaurus.config.js: required fields, site metadata, plugins, presets, themeConfig, i18n, markdown options, and a complete example config."
+---
+
+The `docusaurus.config.js` file (or `docusaurus.config.ts` for TypeScript projects) sits at the root of your site and is the single source of truth for all site-wide settings. Docusaurus validates this file at startup and rejects unknown top-level fields, so any custom values must live inside `customFields`.
+
+The file runs in Node.js and must export a config object or a function that returns one. ES Modules, CommonJS, and TypeScript are all supported.
+
+<CodeGroup>
+
+```js docusaurus.config.js (ESM object)
+export default {
+  title: 'My Site',
+  url: 'https://example.com',
+  baseUrl: '/',
+};
+```
+
+```js docusaurus.config.js (async function)
+export default async function createConfigAsync() {
+  const remarkPlugin = await import('some-esm-only-remark-plugin');
+  return {
+    title: 'My Site',
+    url: 'https://example.com',
+    baseUrl: '/',
+  };
+}
+```
+
+```ts docusaurus.config.ts
+import type {Config} from '@docusaurus/types';
+
+export default {
+  title: 'My Site',
+  url: 'https://example.com',
+  baseUrl: '/',
+} satisfies Config;
+```
+
+</CodeGroup>
+
+---
+
+## Required fields
+
+### `title`
+
+- **Type:** `string`
+
+The name of your website. Used in the browser tab title, the default navbar title, and HTML `<title>` metadata.
+
+```js title="docusaurus.config.js"
+export default {
+  title: 'Acme Docs',
+};
+```
+
+### `url`
+
+- **Type:** `string`
+
+The canonical URL of your site — the scheme plus hostname with no trailing path. For a site at `https://example.com/docs/`, the `url` is `https://example.com`.
+
+```js title="docusaurus.config.js"
+export default {
+  url: 'https://example.com',
+};
+```
+
+<Info>
+For multi-locale sites, individual locales can override `url` via `i18n.localeConfigs[locale].url` to support multi-domain deployments.
+</Info>
+
+### `baseUrl`
+
+- **Type:** `string`
+
+The path segment that follows the hostname. For a site served from `https://example.com/my-project/`, set `baseUrl` to `/my-project/`. For root-level sites use `/`.
+
+```js title="docusaurus.config.js"
+export default {
+  url: 'https://facebook.github.io',
+  baseUrl: '/metro/',
+};
+```
+
+---
+
+## Site metadata
+
+### `tagline`
+
+- **Type:** `string`
+- **Default:** `""`
+
+A short description of your site displayed below the title on the homepage and in metadata.
+
+```js title="docusaurus.config.js"
+export default {
+  tagline: 'Build optimized websites quickly, focus on your content.',
+};
+```
+
+### `favicon`
+
+- **Type:** `string | undefined`
+
+Root-relative path or URL to your site favicon, used in the `<link rel="icon">` tag.
+
+```js title="docusaurus.config.js"
+export default {
+  favicon: '/img/favicon.ico',
+};
+```
+
+### `noIndex`
+
+- **Type:** `boolean`
+- **Default:** `false`
+
+When `true`, adds `<meta name="robots" content="noindex, nofollow">` to every page to prevent search engine indexing. Useful for staging environments.
+
+### `trailingSlash`
+
+- **Type:** `boolean | undefined`
+- **Default:** `undefined`
+
+Controls whether URLs end with a trailing slash and how HTML files are emitted:
+
+| Value | URL behavior | Emitted file |
+| --- | --- | --- |
+| `undefined` | URLs left untouched | `/docs/page/index.html` |
+| `true` | Trailing slash added | `/docs/page/index.html` |
+| `false` | Trailing slash removed | `/docs/page.html` |
+
+### `titleDelimiter`
+
+- **Type:** `string`
+- **Default:** `"|"`
+
+The character used to separate the page title from the site title in the browser tab, e.g., `My Page | My Site`.
+
+### `baseUrlIssueBanner`
+
+- **Type:** `boolean`
+- **Default:** `true`
+
+Shows a user-visible banner when the site's CSS or JS assets fail to load — a common symptom of a misconfigured `baseUrl`.
+
+---
+
+## Deployment fields
+
+These fields are only required when using `docusaurus deploy` to publish to GitHub Pages.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `organizationName` | `string` | GitHub username or organization that owns the repository. |
+| `projectName` | `string` | Name of the GitHub repository. |
+| `deploymentBranch` | `string` | Branch to deploy static files to. Defaults to `gh-pages`. |
+| `githubHost` | `string` | Hostname for GitHub Enterprise deployments. Defaults to `github.com`. |
+| `githubPort` | `string` | Port for GitHub Enterprise SSH. |
+
+---
+
+## Error reporting
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `onBrokenLinks` | `'ignore' \| 'log' \| 'warn' \| 'throw'` | `'throw'` | Behavior when a broken internal link is detected during `build`. |
+| `onBrokenAnchors` | `'ignore' \| 'log' \| 'warn' \| 'throw'` | `'warn'` | Behavior when a broken anchor is detected. |
+| `onDuplicateRoutes` | `'ignore' \| 'log' \| 'warn' \| 'throw'` | `'warn'` | Behavior when two pages share the same route. |
+
+<Warning>
+`onBrokenMarkdownLinks` is deprecated since Docusaurus v3.9 and will be removed in v4. Use `markdown.hooks.onBrokenMarkdownLinks` instead.
+</Warning>
+
+---
+
+## `plugins`
+
+- **Type:** `PluginConfig[]`
+
+An array of plugins to load. Each entry can be a package name string, a `[name, options]` tuple, or an inline plugin function.
+
+```js title="docusaurus.config.js"
+export default {
+  plugins: [
+    '@docusaurus/plugin-content-blog',
+    ['@docusaurus/plugin-sitemap', {changefreq: 'weekly'}],
+    () => ({
+      name: 'my-inline-plugin',
+      async postBuild() {
+        console.log('Build complete');
+      },
+    }),
+  ],
+};
+```
+
+## `themes`
+
+- **Type:** `PluginConfig[]`
+
+An array of theme packages to load alongside plugins.
+
+```js title="docusaurus.config.js"
+export default {
+  themes: ['@docusaurus/theme-classic', '@docusaurus/theme-search-algolia'],
+};
+```
+
+## `presets`
+
+- **Type:** `PresetConfig[]`
+
+Presets bundle a set of plugins and themes together. The `@docusaurus/preset-classic` preset includes the docs, blog, pages, and classic theme packages.
+
+```js title="docusaurus.config.js"
+export default {
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        docs: {
+          sidebarPath: './sidebars.js',
+          editUrl: 'https://github.com/my-org/my-repo/tree/main/',
+        },
+        blog: {
+          showReadingTime: true,
+        },
+        theme: {
+          customCss: ['./src/css/custom.css'],
+        },
+      },
+    ],
+  ],
+};
+```
+
+---
+
+## `themeConfig`
+
+- **Type:** `object`
+
+Theme-specific configuration for the classic theme. The structure depends on which theme you are using; below are the most common keys for `@docusaurus/theme-classic`.
+
+### `colorMode`
+
+Controls light/dark mode behavior.
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    colorMode: {
+      defaultMode: 'light',        // 'light' | 'dark'
+      disableSwitch: false,        // hide the theme toggle
+      respectPrefersColorScheme: true, // follow OS preference
+    },
+  },
+};
+```
+
+### `navbar`
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    navbar: {
+      title: 'My Site',
+      logo: {
+        alt: 'My Site Logo',
+        src: 'img/logo.svg',
+        width: 32,
+        height: 32,
+      },
+      items: [
+        {type: 'docSidebar', sidebarId: 'tutorialSidebar', label: 'Docs', position: 'left'},
+        {to: '/blog', label: 'Blog', position: 'left'},
+        {href: 'https://github.com/my-org/my-repo', label: 'GitHub', position: 'right'},
+      ],
+    },
+  },
+};
+```
+
+### `footer`
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    footer: {
+      style: 'dark',
+      links: [
+        {
+          title: 'Docs',
+          items: [{label: 'Getting Started', to: '/docs/intro'}],
+        },
+        {
+          title: 'Community',
+          items: [{label: 'Stack Overflow', href: 'https://stackoverflow.com/questions/tagged/docusaurus'}],
+        },
+      ],
+      copyright: `Copyright © ${new Date().getFullYear()} My Company, Inc.`,
+    },
+  },
+};
+```
+
+### `prism`
+
+Configures syntax highlighting via Prism.
+
+```js title="docusaurus.config.js"
+import {themes as prismThemes} from 'prism-react-renderer';
+
+export default {
+  themeConfig: {
+    prism: {
+      theme: prismThemes.github,
+      darkTheme: prismThemes.dracula,
+      additionalLanguages: ['bash', 'diff', 'json'],
+    },
+  },
+};
+```
+
+### `algolia`
+
+Configures the DocSearch integration.
+
+```js title="docusaurus.config.js"
+export default {
+  themeConfig: {
+    algolia: {
+      appId: 'YOUR_APP_ID',
+      apiKey: 'YOUR_SEARCH_API_KEY',
+      indexName: 'YOUR_INDEX_NAME',
+    },
+  },
+};
+```
+
+---
+
+## `i18n`
+
+- **Type:** `object`
+
+Configures internationalization for your site.
+
+```js title="docusaurus.config.js"
+export default {
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en', 'fr', 'de'],
+    path: 'i18n',
+    localeConfigs: {
+      en: {label: 'English', direction: 'ltr', htmlLang: 'en-US'},
+      fr: {label: 'Français', direction: 'ltr', htmlLang: 'fr-FR'},
+      de: {label: 'Deutsch', direction: 'ltr', htmlLang: 'de-DE'},
+    },
+  },
+};
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `defaultLocale` | `string` | The primary locale. Served at the base URL without a locale prefix. |
+| `locales` | `string[]` | All locales to build and deploy. Must include `defaultLocale`. |
+| `path` | `string` | Root folder for locale files, relative to the config file. Defaults to `i18n`. |
+| `localeConfigs` | `object` | Per-locale settings. See sub-fields below. |
+
+**Per-locale settings (`localeConfigs[locale]`):**
+
+| Field | Description |
+| --- | --- |
+| `label` | Label shown in the locale dropdown. |
+| `direction` | Text direction: `ltr` (default) or `rtl`. |
+| `htmlLang` | BCP 47 language tag used in `<html lang="...">`. |
+| `calendar` | [Intl calendar](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Locale/calendar) used for date formatting. |
+| `path` | Subfolder name within `i18n/`. Defaults to the locale code. |
+| `translate` | Whether to run translation for this locale. Auto-detected from the folder presence. |
+| `url` | Override the site `url` for this locale (multi-domain deployments). |
+| `baseUrl` | Override the computed `baseUrl` for this locale. |
+
+---
+
+## `markdown`
+
+- **Type:** `MarkdownConfig`
+
+Global Markdown processing options.
+
+```js title="docusaurus.config.js"
+export default {
+  markdown: {
+    format: 'mdx',
+    mermaid: true,
+    emoji: true,
+    preprocessor: ({filePath, fileContent}) => {
+      return fileContent.replaceAll('{{VERSION}}', '3.0.0');
+    },
+    mdx1Compat: {
+      comments: true,
+      admonitions: true,
+      headingIds: true,
+    },
+    anchors: {
+      maintainCase: false,
+    },
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+      onBrokenMarkdownImages: 'throw',
+    },
+  },
+};
+```
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `format` | `'mdx' \| 'md' \| 'detect'` | `'mdx'` | Default parser. `'detect'` picks based on file extension. |
+| `mermaid` | `boolean` | `false` | Render `mermaid` code blocks as diagrams. |
+| `emoji` | `boolean` | `true` | Render emoji shortcodes (`:smile:`) as Unicode characters. |
+| `preprocessor` | `function` | `undefined` | Raw string transform applied to each file before parsing. |
+| `parseFrontMatter` | `function` | `undefined` | Custom front matter parser. Receives the default parser as a parameter. |
+| `mdx1Compat` | `object \| boolean` | all `true` | Compatibility shims for MDX v1 syntax. Disabled when `future.v4.mdx1CompatDisabledByDefault` is set. |
+| `anchors.maintainCase` | `boolean` | `false` | Keep original heading casing in generated anchor IDs. |
+| `remarkRehypeOptions` | `object` | `undefined` | Options forwarded to `remark-rehype`. |
+| `hooks.onBrokenMarkdownLinks` | `severity \| function` | `'warn'` | Behavior or callback when a broken Markdown link is detected. |
+| `hooks.onBrokenMarkdownImages` | `severity \| function` | `'throw'` | Behavior or callback when a broken Markdown image is detected. |
+
+---
+
+## `customFields`
+
+- **Type:** `object`
+- **Default:** `{}`
+
+A place to store arbitrary values that you want accessible across your site via `useDocusaurusContext()`. Docusaurus rejects any unknown top-level config fields — use `customFields` instead.
+
+```js title="docusaurus.config.js"
+export default {
+  customFields: {
+    apiEndpoint: 'https://api.example.com',
+    featureFlags: {newDashboard: true},
+  },
+};
+```
+
+---
+
+## `staticDirectories`
+
+- **Type:** `string[]`
+- **Default:** `['static']`
+
+Directories whose contents are copied verbatim into the build output. Paths are relative to the site root or absolute.
+
+```js title="docusaurus.config.js"
+export default {
+  staticDirectories: ['static', 'public'],
+};
+```
+
+---
+
+## Additional fields
+
+<AccordionGroup>
+  <Accordion title="headTags — inject arbitrary HTML head tags">
+    An array of tag descriptor objects inserted into the HTML `<head>`.
+
+    ```js title="docusaurus.config.js"
+    export default {
+      headTags: [
+        {
+          tagName: 'link',
+          attributes: {rel: 'preconnect', href: 'https://fonts.googleapis.com'},
+        },
+      ],
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="scripts — load external scripts">
+    Strings or attribute objects for `<script>` tags in `<head>`. Tags are render-blocking; add `async: true` or `defer: true` where possible.
+
+    ```js title="docusaurus.config.js"
+    export default {
+      scripts: [
+        {src: 'https://cdn.example.com/analytics.js', async: true},
+      ],
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="stylesheets — load external stylesheets">
+    Strings or attribute objects for `<link>` tags in `<head>`.
+
+    ```js title="docusaurus.config.js"
+    export default {
+      stylesheets: [
+        'https://fonts.googleapis.com/css2?family=Inter',
+      ],
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="clientModules — global client-side modules">
+    JS or CSS files loaded on every page client-side.
+
+    ```js title="docusaurus.config.js"
+    export default {
+      clientModules: ['./src/myGlobalScript.js', './src/myGlobalStyles.css'],
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="storage — browser storage options">
+    Controls the browser storage type and key namespacing used by themes.
+
+    ```js title="docusaurus.config.js"
+    export default {
+      storage: {
+        type: 'localStorage',  // 'localStorage' | 'sessionStorage'
+        namespace: true,       // true auto-generates a namespace from url+baseUrl
+      },
+    };
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Complete example
+
+The following is a realistic `docusaurus.config.ts` for a TypeScript project using `@docusaurus/preset-classic`.
+
+```ts title="docusaurus.config.ts"
+import type {Config} from '@docusaurus/types';
+import {themes as prismThemes} from 'prism-react-renderer';
+
+export default {
+  title: 'Acme Docs',
+  tagline: 'Fast, reliable, and easy to use.',
+  url: 'https://docs.acme.com',
+  baseUrl: '/',
+  favicon: '/img/favicon.ico',
+  organizationName: 'acme-corp',
+  projectName: 'acme-docs',
+  onBrokenLinks: 'throw',
+  onBrokenAnchors: 'warn',
+
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en', 'fr'],
+  },
+
+  presets: [
+    [
+      '@docusaurus/preset-classic',
+      {
+        docs: {
+          sidebarPath: './sidebars.ts',
+          editUrl: 'https://github.com/acme-corp/acme-docs/tree/main/',
+        },
+        blog: {showReadingTime: true},
+        theme: {customCss: './src/css/custom.css'},
+      },
+    ],
+  ],
+
+  themeConfig: {
+    colorMode: {
+      defaultMode: 'light',
+      respectPrefersColorScheme: true,
+    },
+    navbar: {
+      title: 'Acme Docs',
+      logo: {alt: 'Acme Logo', src: 'img/logo.svg'},
+      items: [
+        {type: 'docSidebar', sidebarId: 'mainSidebar', label: 'Docs', position: 'left'},
+        {to: '/blog', label: 'Blog', position: 'left'},
+        {href: 'https://github.com/acme-corp/acme-docs', label: 'GitHub', position: 'right'},
+      ],
+    },
+    footer: {
+      style: 'dark',
+      copyright: `Copyright © ${new Date().getFullYear()} Acme Corp.`,
+    },
+    prism: {
+      theme: prismThemes.github,
+      darkTheme: prismThemes.dracula,
+    },
+    algolia: {
+      appId: 'XXXXXXXXXX',
+      apiKey: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      indexName: 'acme-docs',
+    },
+  },
+
+  markdown: {
+    mermaid: true,
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
+  },
+
+  customFields: {
+    apiVersion: 'v2',
+  },
+} satisfies Config;
+```
